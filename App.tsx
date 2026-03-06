@@ -1,8 +1,8 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Product } from './types';
+import { Product, InventoryItem } from './types';
 import { PrintSettings } from './services/printService';
-import { parseProductFile, saveData, loadData, clearData, saveEmployeeName, parseCurrency, saveDisplayedProducts } from './services/fileParser';
+import { parseProductFile, saveData, loadData, clearData, saveEmployeeName, parseCurrency, saveDisplayedProducts, parseInventoryFile } from './services/fileParser';
 import { printPriceTags } from './services/printService';
 import ResultsDisplay from './components/ResultsDisplay';
 import { LogoIcon, CheckCircleIcon, WarningIcon } from './components/Icons';
@@ -12,10 +12,19 @@ import LayoutSelectionModal from './components/LayoutSelectionModal';
 import ManualInputModal from './components/ManualInputModal';
 import ControlPanel from './components/ControlPanel';
 import PdfPreviewModal from './components/PdfPreviewModal';
+import InventoryToolbar from './components/InventoryToolbar';
 
 export default function App(): React.JSX.Element {
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [inventoryFilters, setInventoryFilters] = useState({
+    maSieuThi: '',
+    nganhHang: '',
+    nhomHang: '',
+    maSanPham: '',
+    tenSanPham: ''
+  });
   const [displayedProducts, setDisplayedProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
@@ -103,6 +112,7 @@ export default function App(): React.JSX.Element {
       const savedData = await loadData();
       if (savedData) {
         setAllProducts(savedData.products || []);
+        setInventory(savedData.inventory || []);
         setDisplayedProducts(savedData.displayedProducts || []);
         if(savedData.fileInfo && savedData.fileInfo.fileName) {
           const savedFileNames = savedData.fileInfo.fileName;
@@ -140,7 +150,10 @@ export default function App(): React.JSX.Element {
     if (files && files.length > 0) {
       setIsLoading(true);
       setError(null);
-      await clearData();
+      // We don't necessarily want to clear inventory when loading products, 
+      // but the user might want a fresh start. 
+      // For now, let's keep inventory unless explicitly cleared.
+      // await clearData(); 
       setAllProducts([]);
       setDisplayedProducts([]);
       setFileName(null);
@@ -215,6 +228,68 @@ export default function App(): React.JSX.Element {
     }
   }, []);
   
+  const handleInventoryFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const items = await parseInventoryFile(file);
+        setInventory(items);
+        await saveInventoryData(items);
+        setError(null);
+      } catch (err) {
+        setError('Lỗi khi xử lý file tồn kho. Vui lòng kiểm tra định dạng file.');
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+        if (event.target) event.target.value = '';
+      }
+    }
+  }, []);
+
+  const handleInventoryFilterChange = useCallback((key: string, value: string) => {
+    setInventoryFilters(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  const handleClearInventoryFilters = useCallback(() => {
+    setInventoryFilters({
+      maSieuThi: '',
+      nganhHang: '',
+      nhomHang: '',
+      maSanPham: '',
+      tenSanPham: ''
+    });
+  }, []);
+
+  // Effect to apply inventory filters
+  useEffect(() => {
+    const { maSieuThi, nganhHang, nhomHang, maSanPham, tenSanPham } = inventoryFilters;
+    
+    // If no filters are active, don't auto-update displayedProducts 
+    // (unless we want to show everything, but that's usually too much)
+    if (!maSieuThi && !nganhHang && !nhomHang && !maSanPham && !tenSanPham) {
+      return;
+    }
+
+    const filteredInventory = inventory.filter(item => {
+      return (
+        (!maSieuThi || item.maSieuThi === maSieuThi) &&
+        (!nganhHang || item.nganhHang === nganhHang) &&
+        (!nhomHang || item.nhomHang === nhomHang) &&
+        (!maSanPham || item.maSanPham.toLowerCase().includes(maSanPham.toLowerCase())) &&
+        (!tenSanPham || item.tenSanPham.toLowerCase().includes(tenSanPham.toLowerCase()))
+      );
+    });
+
+    const matchingMsps = new Set(filteredInventory.map(item => item.maSanPham));
+    const matchingProducts = allProducts
+      .filter(p => matchingMsps.has(p.msp))
+      .map(p => ({ ...p, selected: false, quantity: 1 }));
+
+    setDisplayedProducts(matchingProducts);
+  }, [inventoryFilters, inventory, allProducts]);
+
   const handleEmployeeNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmployeeName(e.target.value);
   };
@@ -643,6 +718,7 @@ export default function App(): React.JSX.Element {
             onOpenScanner={() => setIsScannerOpen(true)}
             onSuggestionClick={handleSuggestionClick}
             onFileChange={handleFileChange}
+            onInventoryFileChange={handleInventoryFileChange}
             onShowTopBonus={handleShowTopBonus}
             onShowTopDiscount={handleShowTopDiscount}
             onOpenManualInput={() => setIsManualInputOpen(true)}
@@ -674,6 +750,13 @@ export default function App(): React.JSX.Element {
               )}
 
             <input type="file" ref={importInputRef} onChange={handleImport} accept=".json" className="hidden" multiple />
+
+            <InventoryToolbar 
+              inventory={inventory}
+              filters={inventoryFilters}
+              onFilterChange={handleInventoryFilterChange}
+              onClearFilters={handleClearInventoryFilters}
+            />
 
             <ResultsDisplay 
               results={displayedProducts} 

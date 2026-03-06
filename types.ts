@@ -11,3 +11,23 @@ export interface Product {
   selected: boolean;
   quantity: number;
 }
+
+export interface InventoryItem {
+  maSieuThi: string;
+  tenSieuThi: string;
+  thuongHieu: string;
+  nganhHang: string;
+  nhomHang: string;
+  maSanPham: string;
+  tenSanPham: string;
+  trangThaiKinhDoanh: string;
+  trangThaiSanPham: string;
+  tongSoLuong: number;
+  soLuongDiDuong: number;
+  soLuongThucTe: number;
+  soLuongDaDat: number;
+  soLuongCoTheBan: number;
+  sucBan: string;
+  saleAverage: number;
+  saleEstimate: number;
+}

@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Product } from '../types';
 import FileUpload from './FileUpload';
 import SearchBar from './SearchBar';
-import { PrintIcon, SettingsIcon, StarIcon, TagIcon, TrashIcon, ExportIcon, ImportIcon, PenSquareIcon } from './Icons';
+import { PrintIcon, SettingsIcon, StarIcon, TagIcon, TrashIcon, ExportIcon, ImportIcon, PenSquareIcon, InventoryIcon } from './Icons';
 
 interface ControlPanelProps {
     employeeName: string;
@@ -24,6 +24,7 @@ interface ControlPanelProps {
     onOpenScanner: () => void;
     onSuggestionClick: (product: Product) => void;
     onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    onInventoryFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
     onShowTopBonus: () => void;
     onShowTopDiscount: () => void;
     onOpenManualInput: () => void;
@@ -75,12 +76,29 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                         </div>
                     )}
                 </div>
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 flex gap-2">
                     <FileUpload 
                         onFileChange={props.onFileChange} 
                         fileName={props.fileName} 
                         disabled={props.isLoading} 
                     />
+                    <div className="relative">
+                        <input
+                            type="file"
+                            id="inventory-file-input"
+                            onChange={props.onInventoryFileChange}
+                            accept=".xlsx, .xls"
+                            className="hidden"
+                            disabled={props.isLoading}
+                        />
+                        <label
+                            htmlFor="inventory-file-input"
+                            className={`flex items-center justify-center p-2 rounded-lg border-2 border-dashed transition-all cursor-pointer h-10 w-10 ${props.isLoading ? 'bg-slate-50 border-slate-200 cursor-not-allowed' : 'bg-white border-indigo-200 hover:border-indigo-400 text-indigo-600'}`}
+                            title="Nhập file tồn kho (.xlsx, .xls)"
+                        >
+                            <InventoryIcon className="h-5 w-5" />
+                        </label>
+                    </div>
                 </div>
             </div>
 

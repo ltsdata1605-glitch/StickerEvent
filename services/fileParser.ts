@@ -1,4 +1,4 @@
-import { Product } from '../types';
+import { Product, InventoryItem } from '../types';
 import * as XLSX from 'xlsx';
 
 function parseBonus(bonusCode: string | undefined | null): { thuongERP: number; thuongNong: number } {
@@ -159,6 +159,55 @@ export const parseProductFile = (file: File): Promise<{ products: Product[], exp
   });
 };
 
+export const parseInventoryFile = (file: File): Promise<InventoryItem[]> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e: ProgressEvent<FileReader>) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        // Skip header row (row 0)
+        const inventory: InventoryItem[] = json.slice(1).map((row) => {
+          return {
+            maSieuThi: String(row[0] || '').trim(),
+            tenSieuThi: String(row[1] || '').trim(),
+            thuongHieu: String(row[2] || '').trim(),
+            nganhHang: String(row[3] || '').trim(),
+            nhomHang: String(row[4] || '').trim(),
+            maSanPham: String(row[5] || '').trim(),
+            tenSanPham: String(row[6] || '').trim(),
+            trangThaiKinhDoanh: String(row[7] || '').trim(),
+            trangThaiSanPham: String(row[8] || '').trim(),
+            tongSoLuong: Number(row[9] || 0),
+            soLuongDiDuong: Number(row[10] || 0),
+            soLuongThucTe: Number(row[11] || 0),
+            soLuongDaDat: Number(row[12] || 0),
+            soLuongCoTheBan: Number(row[13] || 0),
+            sucBan: String(row[14] || '').trim(),
+            saleAverage: Number(row[15] || 0),
+            saleEstimate: Number(row[16] || 0),
+          };
+        }).filter(item => item.maSanPham);
+
+        resolve(inventory);
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    reader.onerror = (error) => {
+      reject(error);
+    };
+
+    reader.readAsArrayBuffer(file);
+  });
+};
+
 // --- IndexedDB Persistence ---
 
 const DB_NAME = 'ProductSearchDB';
@@ -196,6 +245,11 @@ export const saveData = async (products: Product[], fileInfo: FileInfo): Promise
   store.put(fileInfo, 'fileInfo');
 };
 
+export const saveInventoryData = async (inventory: InventoryItem[]): Promise<void> => {
+    const store = await getStore('readwrite');
+    store.put(inventory, 'inventory');
+};
+
 export const saveDisplayedProducts = async (products: Product[]): Promise<void> => {
     const store = await getStore('readwrite');
     store.put(products, 'displayedProducts');
@@ -206,18 +260,19 @@ export const saveEmployeeName = async (name: string): Promise<void> => {
     store.put(name, 'employeeName');
 };
 
-export const loadData = async (): Promise<{ products: Product[]; displayedProducts: Product[]; fileInfo: FileInfo | null; employeeName: string; } | null> => {
+export const loadData = async (): Promise<{ products: Product[]; displayedProducts: Product[]; inventory: InventoryItem[]; fileInfo: FileInfo | null; employeeName: string; } | null> => {
     try {
         const store = await getStore('readonly');
         const productsReq = store.get('products');
         const displayedProductsReq = store.get('displayedProducts');
+        const inventoryReq = store.get('inventory');
         const fileInfoReq = store.get('fileInfo');
         const employeeNameReq = store.get('employeeName');
 
         return new Promise((resolve) => {
-            const results: any = { products: [], displayedProducts: [], fileInfo: null, employeeName: '' };
+            const results: any = { products: [], displayedProducts: [], inventory: [], fileInfo: null, employeeName: '' };
             let completed = 0;
-            const totalRequests = 4;
+            const totalRequests = 5;
 
             const checkCompletion = () => {
                 completed++;
@@ -232,15 +287,15 @@ export const loadData = async (): Promise<{ products: Product[]; displayedProduc
             };
 
             productsReq.onsuccess = () => {
-                // FIX: Defensively check if the loaded data from IndexedDB is an array.
-                // Data corruption could lead to an object being stored instead of an array,
-                // causing a type error when `setAllProducts` is called in App.tsx.
                 results.products = Array.isArray(productsReq.result) ? productsReq.result : [];
                 checkCompletion();
             };
             displayedProductsReq.onsuccess = () => {
-                // FIX: Defensively check if the loaded data from IndexedDB is an array.
                 results.displayedProducts = Array.isArray(displayedProductsReq.result) ? displayedProductsReq.result : [];
+                checkCompletion();
+            };
+            inventoryReq.onsuccess = () => {
+                results.inventory = Array.isArray(inventoryReq.result) ? inventoryReq.result : [];
                 checkCompletion();
             };
             fileInfoReq.onsuccess = () => {
@@ -254,6 +309,7 @@ export const loadData = async (): Promise<{ products: Product[]; displayedProduc
             
             productsReq.onerror = onError;
             displayedProductsReq.onerror = onError;
+            inventoryReq.onerror = onError;
             fileInfoReq.onerror = onError;
             employeeNameReq.onerror = onError;
         });
@@ -268,4 +324,5 @@ export const clearData = async (): Promise<void> => {
   store.delete('products');
   store.delete('fileInfo');
   store.delete('displayedProducts');
+  store.delete('inventory');
 };

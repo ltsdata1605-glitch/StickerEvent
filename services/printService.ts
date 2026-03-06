@@ -140,7 +140,7 @@ const generateModernPriceTagHTML = (product: Product, employeeName: string, sett
                     <!-- ProductContent -->
                     <div class="p-modern-body flex-grow">
                         <!-- Product Header -->
-                        <header class="mb-0 min-h-[5.5rem] flex items-start justify-between gap-2 pl-24">
+                        <header class="mb-0 h-header-fixed flex items-start justify-between gap-2 pl-24">
                             ${(() => {
                                 const nameLen = product.sanPham.length;
                                 let titleClass = 'text-3xl';
@@ -577,6 +577,7 @@ const getPrintStyles = (settings: PrintSettings): string => {
       .text-\\[10rem\\] { font-size: 10rem; }
       .text-\\[13rem\\] { font-size: 13rem; }
       .text-\\[10px\\] { font-size: 10px; }
+      .h-header-fixed { height: 6.5rem; overflow: hidden; }
       
       .font-bold { font-weight: 700; }
       .font-black { font-weight: 900; }

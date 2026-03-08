@@ -2,8 +2,9 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Product, InventoryItem } from './types';
 import { PrintSettings } from './services/printService';
-import { parseProductFile, saveData, loadData, clearData, saveEmployeeName, parseCurrency, saveDisplayedProducts, parseInventoryFile } from './services/fileParser';
+import { parseProductFile, saveData, loadData, clearData, saveEmployeeName, parseCurrency, saveDisplayedProducts, parseInventoryFile, saveInventoryData } from './services/fileParser';
 import { printPriceTags } from './services/printService';
+import * as XLSX from 'xlsx';
 import ResultsDisplay from './components/ResultsDisplay';
 import { LogoIcon, CheckCircleIcon, WarningIcon } from './components/Icons';
 import Scanner from './components/Scanner';
@@ -18,13 +19,20 @@ export default function App(): React.JSX.Element {
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [inventoryFilters, setInventoryFilters] = useState({
-    maSieuThi: '',
-    nganhHang: '',
-    nhomHang: '',
+  const [inventoryFilters, setInventoryFilters] = useState<{
+    maSieuThi: string[];
+    nganhHang: string[];
+    nhomHang: string[];
+    maSanPham: string;
+    tenSanPham: string;
+  }>({
+    maSieuThi: [],
+    nganhHang: [],
+    nhomHang: [],
     maSanPham: '',
     tenSanPham: ''
   });
+  const [useInventoryQuantity, setUseInventoryQuantity] = useState(false);
   const [displayedProducts, setDisplayedProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
@@ -34,6 +42,7 @@ export default function App(): React.JSX.Element {
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [showNoResults, setShowNoResults] = useState(false);
   const [uploadTimestamp, setUploadTimestamp] = useState<Date | null>(null);
+  const [inventoryUploadTimestamp, setInventoryUploadTimestamp] = useState<Date | null>(null);
   const [fileExportDate, setFileExportDate] = useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [duplicateError, setDuplicateError] = useState<boolean>(false);
@@ -125,6 +134,7 @@ export default function App(): React.JSX.Element {
           setUploadTimestamp(savedData.fileInfo.uploadTimestamp ? new Date(savedData.fileInfo.uploadTimestamp) : null);
           setFileExportDate(savedData.fileInfo.fileExportDate);
         }
+        setInventoryUploadTimestamp(savedData.inventoryUploadTimestamp ? new Date(savedData.inventoryUploadTimestamp) : null);
         const name = savedData.employeeName || '';
         setEmployeeName(name);
         if (!name) {
@@ -235,8 +245,10 @@ export default function App(): React.JSX.Element {
       setError(null);
       try {
         const items = await parseInventoryFile(file);
+        const newTimestamp = new Date();
         setInventory(items);
-        await saveInventoryData(items);
+        setInventoryUploadTimestamp(newTimestamp);
+        await saveInventoryData(items, newTimestamp);
         setError(null);
       } catch (err) {
         setError('Lỗi khi xử lý file tồn kho. Vui lòng kiểm tra định dạng file.');
@@ -248,15 +260,79 @@ export default function App(): React.JSX.Element {
     }
   }, []);
 
-  const handleInventoryFilterChange = useCallback((key: string, value: string) => {
+  const handleDownloadSampleInventory = useCallback(() => {
+    if (inventory.length === 0) return;
+
+    // Group inventory by nganhHang
+    const groupedByNganhHang = inventory.reduce((acc, item) => {
+      const nganhHang = item.nganhHang || 'Khong_xac_dinh';
+      if (!acc[nganhHang]) {
+        acc[nganhHang] = [];
+      }
+      if (item.maSanPham) {
+        // Use a Set or just array, but let's keep it simple. We can deduplicate if needed, 
+        // but the prompt doesn't explicitly ask for deduplication. We'll just push.
+        // Actually, deduplication might be good, but let's just push.
+        acc[nganhHang].push(item.maSanPham);
+      }
+      return acc;
+    }, {} as Record<string, string[]>);
+
+    // Create and download a file for each nganhHang
+    const downloadFiles = async () => {
+      const entries = Object.entries(groupedByNganhHang) as [string, string[]][];
+      for (let i = 0; i < entries.length; i++) {
+        const [nganhHang, maSanPhams] = entries[i];
+        if (maSanPhams.length === 0) continue;
+
+        // Deduplicate maSanPham for each file
+        const uniqueMaSanPhams = Array.from(new Set(maSanPhams));
+
+        const wb = XLSX.utils.book_new();
+        
+        const data = [['Mã sản phẩm']];
+        uniqueMaSanPhams.forEach(msp => {
+          data.push([msp]);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        
+        // Format all cells in the first column as text
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+          const cellAddress = XLSX.utils.encode_cell({ c: 0, r: R });
+          if (!ws[cellAddress]) continue;
+          ws[cellAddress].t = 's'; // Set type to string
+          ws[cellAddress].z = '@'; // Set format to text
+        }
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Sample');
+        
+        // Sanitize filename to remove invalid characters
+        const safeFileName = nganhHang.replace(/[/\\?%*:|"<>]/g, '-');
+        
+        // Generate Excel file and trigger download
+        XLSX.writeFile(wb, `${safeFileName}.xls`, { bookType: 'biff8' });
+
+        // Add a small delay to prevent browser from blocking multiple downloads
+        if (i < entries.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      }
+    };
+
+    downloadFiles();
+  }, [inventory]);
+
+  const handleInventoryFilterChange = useCallback((key: string, value: string | string[]) => {
     setInventoryFilters(prev => ({ ...prev, [key]: value }));
   }, []);
 
   const handleClearInventoryFilters = useCallback(() => {
     setInventoryFilters({
-      maSieuThi: '',
-      nganhHang: '',
-      nhomHang: '',
+      maSieuThi: [],
+      nganhHang: [],
+      nhomHang: [],
       maSanPham: '',
       tenSanPham: ''
     });
@@ -268,27 +344,44 @@ export default function App(): React.JSX.Element {
     
     // If no filters are active, don't auto-update displayedProducts 
     // (unless we want to show everything, but that's usually too much)
-    if (!maSieuThi && !nganhHang && !nhomHang && !maSanPham && !tenSanPham) {
+    if (maSieuThi.length === 0 && nganhHang.length === 0 && nhomHang.length === 0 && !maSanPham && !tenSanPham) {
       return;
     }
 
     const filteredInventory = inventory.filter(item => {
       return (
-        (!maSieuThi || item.maSieuThi === maSieuThi) &&
-        (!nganhHang || item.nganhHang === nganhHang) &&
-        (!nhomHang || item.nhomHang === nhomHang) &&
+        (maSieuThi.length === 0 || maSieuThi.includes(item.maSieuThi)) &&
+        (nganhHang.length === 0 || nganhHang.includes(item.nganhHang)) &&
+        (nhomHang.length === 0 || nhomHang.includes(item.nhomHang)) &&
         (!maSanPham || item.maSanPham.toLowerCase().includes(maSanPham.toLowerCase())) &&
         (!tenSanPham || item.tenSanPham.toLowerCase().includes(tenSanPham.toLowerCase()))
       );
     });
 
+    const inventoryMap = new Map(filteredInventory.map(item => [item.maSanPham, item.tongSoLuong]));
+
     const matchingMsps = new Set(filteredInventory.map(item => item.maSanPham));
     const matchingProducts = allProducts
       .filter(p => matchingMsps.has(p.msp))
-      .map(p => ({ ...p, selected: false, quantity: 1 }));
+      .map(p => ({ 
+          ...p, 
+          selected: false, 
+          quantity: useInventoryQuantity ? (inventoryMap.get(p.msp) || 1) : 1 
+      }));
 
     setDisplayedProducts(matchingProducts);
-  }, [inventoryFilters, inventory, allProducts]);
+  }, [inventoryFilters, inventory, allProducts]); // Removed useInventoryQuantity from here
+
+  const handleUseInventoryQuantityChange = useCallback((checked: boolean) => {
+    setUseInventoryQuantity(checked);
+    setDisplayedProducts(prev => {
+      const inventoryMap = new Map(inventory.map(item => [item.maSanPham, item.tongSoLuong]));
+      return prev.map(p => ({
+        ...p,
+        quantity: checked ? (inventoryMap.get(p.msp) || 1) : 1
+      }));
+    });
+  }, [inventory]);
 
   const handleEmployeeNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmployeeName(e.target.value);
@@ -362,7 +455,9 @@ export default function App(): React.JSX.Element {
             setHighlightedMsp(null);
         }, 2000);
     } else {
-        setDisplayedProducts(prevProducts => [{...product, selected: false, quantity: 1}, ...prevProducts]);
+        const inventoryItem = inventory.find(item => item.maSanPham === product.msp);
+        const qty = useInventoryQuantity && inventoryItem ? inventoryItem.tongSoLuong : 1;
+        setDisplayedProducts(prevProducts => [{...product, selected: false, quantity: qty}, ...prevProducts]);
     }
     setSearchQuery('');
     setSuggestions([]);
@@ -387,7 +482,9 @@ export default function App(): React.JSX.Element {
         return newProducts;
       } else {
         // Product does not exist, add it to the top
-        return [{ ...product, selected: false, quantity: 1 }, ...prevProducts];
+        const inventoryItem = inventory.find(item => item.maSanPham === product.msp);
+        const qty = useInventoryQuantity && inventoryItem ? inventoryItem.tongSoLuong : 1;
+        return [{ ...product, selected: false, quantity: qty }, ...prevProducts];
       }
     });
     
@@ -479,15 +576,16 @@ export default function App(): React.JSX.Element {
   };
 
   const handleShowTopBonus = useCallback(() => {
+    const inventoryMap = new Map(inventory.map(item => [item.maSanPham, item.tongSoLuong]));
     const sortedProducts: Product[] = allProducts.slice()
         .filter((p): p is Product => !!(p && p.msp))
         .sort((a, b) => b.tongThuong - a.tongThuong)
-        .slice(0, 100)
-        .map((p): Product => ({...p, selected: false, quantity: 1}));
+        .map((p): Product => ({...p, selected: false, quantity: useInventoryQuantity ? (inventoryMap.get(p.msp) || 1) : 1}));
     setDisplayedProducts(sortedProducts);
-  }, [allProducts]);
+  }, [allProducts, inventory, useInventoryQuantity]);
 
   const handleShowTopDiscount = useCallback(() => {
+      const inventoryMap = new Map(inventory.map(item => [item.maSanPham, item.tongSoLuong]));
       const sortedProducts: Product[] = allProducts.slice()
         .filter((p): p is Product => !!(p && p.msp))
         .sort((a, b) => {
@@ -495,12 +593,11 @@ export default function App(): React.JSX.Element {
             const discountB = parseCurrency(b.giaGoc) - parseCurrency(b.giaGiam);
             return discountB - discountA;
         })
-        .slice(0, 100)
-        .map((p): Product => ({...p, selected: false, quantity: 1}));
+        .map((p): Product => ({...p, selected: false, quantity: useInventoryQuantity ? (inventoryMap.get(p.msp) || 1) : 1}));
       setDisplayedProducts(sortedProducts);
-  }, [allProducts]);
+  }, [allProducts, inventory, useInventoryQuantity]);
 
-  const executeReset = useCallback(() => {
+  const executeReset = useCallback(async () => {
     setDisplayedProducts([]); // Direct update to empty array
     setSearchQuery('');
     setSuggestions([]);
@@ -508,6 +605,28 @@ export default function App(): React.JSX.Element {
     setDuplicateError(false);
     setError(null);
     setIsResetConfirmOpen(false);
+    
+    // Clear all files and inventory data
+    setAllProducts([]);
+    setInventory([]);
+    setFileName(null);
+    setUploadTimestamp(null);
+    setInventoryUploadTimestamp(null);
+    setInventoryFilters({
+      maSieuThi: [],
+      nganhHang: [],
+      nhomHang: [],
+      maSanPham: '',
+      tenSanPham: ''
+    });
+    
+    // Clear from indexedDB
+    try {
+      await saveData([], null);
+      await saveInventoryData([], null);
+    } catch (err) {
+      console.error('Error clearing data from IndexedDB:', err);
+    }
   }, []);
 
   const handleReset = () => {
@@ -667,7 +786,7 @@ export default function App(): React.JSX.Element {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col items-center p-4 sm:p-6 lg:p-8">
+    <div className={`min-h-screen bg-slate-100 text-slate-800 flex flex-col items-center p-4 sm:p-6 lg:p-8 ${isMobile ? 'pb-24' : ''}`}>
       <div className="w-full max-w-7xl mx-auto">
         <header className="text-center mb-8">
           <div className="flex items-center justify-center gap-4 mb-2">
@@ -681,23 +800,6 @@ export default function App(): React.JSX.Element {
           </p>
         </header>
 
-        {fileName && uploadTimestamp && fileExportDate && !isLoading && !isInitializing && (
-           <div className="bg-green-50 text-green-800 border border-green-200 rounded-lg p-3 flex items-center gap-3 mb-6">
-              <CheckCircleIcon className="h-6 w-6 text-green-500 flex-shrink-0"/>
-              <div>
-                  <p className="text-sm font-medium">
-                      {fileName.includes('tệp') ? 
-                          <span className="font-bold">{fileName}</span> : 
-                          <>File <span className="font-bold">{fileName}</span></>
-                      } đã được cập nhật lúc <span className="font-bold">{uploadTimestamp.toLocaleTimeString('vi-VN')}</span>.
-                  </p>
-                  <p className="text-xs">
-                      Ngày xuất file: <span className="font-semibold">{fileExportDate}</span>
-                  </p>
-              </div>
-           </div>
-        )}
-
         <main className="flex flex-col lg:flex-row gap-8">
           <ControlPanel 
             employeeName={employeeName}
@@ -710,6 +812,9 @@ export default function App(): React.JSX.Element {
             isLoading={isLoading}
             fileName={fileName}
             isMobile={isMobile}
+            uploadTimestamp={uploadTimestamp}
+            inventoryUploadTimestamp={inventoryUploadTimestamp}
+            hasInventory={inventory.length > 0}
             onEmployeeNameChange={handleEmployeeNameChange}
             onSaveEmployeeName={handleSaveEmployeeName}
             onEmployeeNameKeyDown={handleEmployeeNameKeyDown}
@@ -719,6 +824,7 @@ export default function App(): React.JSX.Element {
             onSuggestionClick={handleSuggestionClick}
             onFileChange={handleFileChange}
             onInventoryFileChange={handleInventoryFileChange}
+            onDownloadSampleInventory={handleDownloadSampleInventory}
             onShowTopBonus={handleShowTopBonus}
             onShowTopDiscount={handleShowTopDiscount}
             onOpenManualInput={() => setIsManualInputOpen(true)}
@@ -754,8 +860,10 @@ export default function App(): React.JSX.Element {
             <InventoryToolbar 
               inventory={inventory}
               filters={inventoryFilters}
+              useInventoryQuantity={useInventoryQuantity}
               onFilterChange={handleInventoryFilterChange}
               onClearFilters={handleClearInventoryFilters}
+              onUseInventoryQuantityChange={handleUseInventoryQuantityChange}
             />
 
             <ResultsDisplay 
@@ -792,6 +900,8 @@ export default function App(): React.JSX.Element {
               onSelect={executePrint}
               stickerStyle={printSettings.stickerStyle || 'default'}
               onStickerStyleChange={(style) => setPrintSettings({ ...printSettings, stickerStyle: style })}
+              modernPositions={printSettings.modernPositions}
+              onModernPositionsChange={(positions) => setPrintSettings({ ...printSettings, modernPositions: positions })}
               onClose={() => {
                 setIsLayoutModalOpen(false);
                 setProductToPrint(null);

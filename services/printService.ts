@@ -30,7 +30,7 @@ const getLayoutConfig = (tagsPerPage: PrintSettings['tagsPerPage']) => {
         case 1:  return { orientation: 'landscape', cols: 1, rows: 1, sizeClass: 'size-single' };
         case 2:  return { orientation: 'portrait', cols: 1, rows: 2, sizeClass: 'size-double' };
         case 8:  return { orientation: 'portrait', cols: 2, rows: 4, sizeClass: 'size-medium' };
-        case 24: return { orientation: 'portrait', cols: 3, rows: 8, sizeClass: 'size-tiny' };
+        case 24: return { orientation: 'portrait', cols: 4, rows: 8, sizeClass: 'size-tiny' };
         case 16: return { orientation: 'landscape', cols: 4, rows: 4, sizeClass: 'size-small' };
         case 4:
         default: return { orientation: 'landscape', cols: 2, rows: 2, sizeClass: 'size-large' };
@@ -140,12 +140,12 @@ const generateModernPriceTagHTML = (product: Product, employeeName: string, sett
                     <!-- ProductContent -->
                     <div class="p-modern-body flex-grow">
                         <!-- Product Header -->
-                        <header class="mb-0 h-header-fixed flex items-start justify-between gap-2 pl-24">
+                        <header class="mb-0 h-header-fixed flex items-start justify-end gap-2 pl-14 pt-1 pr-2">
                             ${(() => {
                                 const nameLen = product.sanPham.length;
                                 let titleClass = 'text-3xl';
                                 if (nameLen < 20) titleClass = 'text-5xl';
-                                else if (nameLen < 40) titleClass = 'text-4xl';
+                                else if (nameLen <= 34) titleClass = 'text-4xl';
                                 else if (nameLen < 60) titleClass = 'text-3xl';
                                 else titleClass = 'text-2xl';
                                 
@@ -155,24 +155,13 @@ const generateModernPriceTagHTML = (product: Product, employeeName: string, sett
                                 </h1>
                                 `;
                             })()}
-                            <div class="flex flex-col items-center justify-center shrink-0 gap-2">
-                                ${settings.showQrCode ? `
-                                <div class="w-20 h-20">
-                                    <img alt="QR" class="w-full h-full object-contain block" src="${qrCodeUrl}"/>
-                                </div>
-                                ` : ''}
-                                <div class="text-[8px] uppercase text-center leading-none">
-                                    <p class="m-0 mb-0.5">${employeeInfoString}</p>
-                                    <p class="m-0">${printTimestamp}</p>
-                                </div>
-                            </div>
                         </header>
                         
                         <!-- Pricing Area -->
-                        <section class="flex items-center gap-6 mb-0">
+                        <section class="flex items-center justify-center gap-6 mb-0">
                             <!-- Original Price -->
                             ${settings.showOriginalPrice && originalPrice > finalPrice ? `
-                            <div class="text-5xl font-bold text-gray-400 line-through decoration-gray-400 decoration-4">
+                            <div class="text-5xl font-bold text-gray-600 line-through decoration-gray-600 decoration-4">
                                 ${originalPriceFormatted}
                             </div>
                             ` : ''}
@@ -180,24 +169,24 @@ const generateModernPriceTagHTML = (product: Product, employeeName: string, sett
                             <!-- Savings Box -->
                             ${savings > 0 ? `
                             <div class="bg-black text-white px-2 py-1 rounded flex items-center justify-center gap-2">
-                                <div class="flex flex-col text-xl leading-none font-bold items-center justify-center">
+                                <div class="flex flex-col text-xl leading-none font-black items-center justify-center">
                                     <span>TIẾT</span>
                                     <span>KIỆM</span>
                                 </div>
-                                <span class="text-5xl font-bold uppercase">${savingsText}</span>
+                                <span class="text-5xl font-black uppercase">${savingsText}</span>
                             </div>
                             ` : ''}
                         </section>
                         
                         <!-- Main Promotional Price -->
-                        <section class="flex items-baseline">
+                        <section class="flex items-baseline justify-center">
                             <span class="text-[13rem] font-black leading-none tracking-tighter modern-primary-font">${bigPart}</span>
                             <span class="text-6xl font-black ml-1 modern-primary-font">${smallPart}</span>
                         </section>
                     </div>
                     
                     <!-- FooterSection -->
-                    <footer class="w-full border-t-2 border-black flex h-28 bg-white shrink-0">
+                    <footer class="w-full border-t-2 border-black flex h-28 bg-white shrink-0 box-border">
                         <!-- Promotion Footer Text -->
                         <div class="flex-grow flex flex-col items-center justify-center px-6 h-full overflow-hidden gap-0 relative">
                             ${(() => {
@@ -206,7 +195,12 @@ const generateModernPriceTagHTML = (product: Product, employeeName: string, sett
                                 const promoText = rawPromo || 'SẢN PHẨM BÁN CHẠY';
                                 
                                 // Split by "•" and clean up
-                                let promoLines = promoText.split('•').map(s => s.trim()).filter(Boolean);
+                                let promoLines = [...new Set(promoText.split('•').map(s => {
+                                    let clean = s.trim();
+                                    // Remove "HỖ TRỢ " prefix if present (case insensitive)
+                                    clean = clean.replace(/^HỖ TRỢ\s+/i, '');
+                                    return clean;
+                                }).filter(Boolean))];
                                 
                                 // If splitting resulted in empty array (e.g. string was just "•"), fallback
                                 if (promoLines.length === 0) {
@@ -231,11 +225,20 @@ const generateModernPriceTagHTML = (product: Product, employeeName: string, sett
                                     </p>
                                 `).join('');
                             })()}
-                            
-                            <!-- Metadata Removed from Footer -->
                         </div>
                         
-                        <!-- QR Code Area Removed -->
+                        <!-- QR Code and Metadata Area -->
+                        <div class="w-32 border-l-2 border-black flex flex-col items-center justify-center shrink-0 p-1 bg-white h-full box-border overflow-hidden">
+                            ${settings.showQrCode ? `
+                            <div class="w-16 h-16 mb-1 shrink-0 flex items-center justify-center">
+                                <img alt="QR" class="max-w-full max-h-full object-contain block" src="${qrCodeUrl}"/>
+                            </div>
+                            ` : ''}
+                            <div class="text-[8px] uppercase text-center leading-none shrink-0 w-full overflow-hidden whitespace-nowrap text-ellipsis">
+                                <p class="m-0 mb-0-5 overflow-hidden text-ellipsis">${employeeInfoString}</p>
+                                <p class="m-0">${printTimestamp}</p>
+                            </div>
+                        </div>
                     </footer>
                 </div>
             </div>
@@ -563,6 +566,9 @@ const getPrintStyles = (settings: PrintSettings): string => {
       /* Tailwind-like utilities for Modern Tag */
       .pl-40 { padding-left: 10rem; }
       .pl-24 { padding-left: 6rem; }
+      .pl-20 { padding-left: 5rem; }
+      .pl-14 { padding-left: 3.5rem; }
+      .pr-4 { padding-right: 1rem; }
       .text-right { text-align: right; }
       .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
       .text-2xl { font-size: 1.5rem; line-height: 2rem; }
@@ -577,6 +583,7 @@ const getPrintStyles = (settings: PrintSettings): string => {
       .text-\\[10rem\\] { font-size: 10rem; }
       .text-\\[13rem\\] { font-size: 13rem; }
       .text-\\[10px\\] { font-size: 10px; }
+      .text-\\[8px\\] { font-size: 8px; }
       .h-header-fixed { height: 6.5rem; overflow: hidden; }
       
       .font-bold { font-weight: 700; }
@@ -589,6 +596,8 @@ const getPrintStyles = (settings: PrintSettings): string => {
       .text-gray-600 { color: #4b5563; }
       .text-gray-500 { color: #6b7280; }
       .text-gray-400 { color: #9ca3af; }
+      .decoration-gray-600 { text-decoration-color: #4b5563; }
+      .decoration-gray-400 { text-decoration-color: #9ca3af; }
       .text-white { color: #ffffff; }
       
       .bg-black { background-color: #000000; }
@@ -602,22 +611,33 @@ const getPrintStyles = (settings: PrintSettings): string => {
       .flex-col { flex-direction: column; }
       .items-center { align-items: center; }
       .items-baseline { align-items: baseline; }
+      .items-start { align-items: flex-start; }
       .justify-center { justify-content: center; }
       .justify-between { justify-content: space-between; }
+      .justify-end { justify-content: flex-end; }
       .flex-grow { flex-grow: 1; }
       .shrink-0 { flex-shrink: 0; }
+      .box-border { box-sizing: border-box; }
+      .overflow-hidden { overflow: hidden; }
+      .whitespace-nowrap { white-space: nowrap; }
+      .text-ellipsis { text-overflow: ellipsis; }
       
       .gap-3 { gap: 0.75rem; }
       .gap-6 { gap: 1.5rem; }
       .gap-0 { gap: 0; }
       
       /* Custom padding for modern layout */
-      .p-modern-body { padding: 2px 20px 0px 144px; }
+      .p-modern-body { padding: 0px 10px; }
+      .p-1 { padding: 0.25rem; }
+      .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+      .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
       .px-4 { padding-left: 1rem; padding-right: 1rem; }
       .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
       .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
       .p-2 { padding: 0.5rem; }
       .p-0 { padding: 0; }
+      .pt-2 { padding-top: 0.5rem; }
+      .pt-3 { padding-top: 0.75rem; }
       
       .m-0 { margin: 0; }
       .mb-4 { margin-bottom: 1rem; }
@@ -626,6 +646,8 @@ const getPrintStyles = (settings: PrintSettings): string => {
       .mb-0 { margin-bottom: 0; }
       .ml-1 { margin-left: 0.25rem; }
       .mt-1 { margin-top: 0.25rem; }
+      .mt-neg-1 { margin-top: -0.25rem; }
+      .mt-neg-2 { margin-top: -0.5rem; }
       
       .w-full { width: 100%; }
       .h-full { height: 100%; }
@@ -638,12 +660,20 @@ const getPrintStyles = (settings: PrintSettings): string => {
       .mt-0-5 { margin-top: 0.125rem; }
       .gap-1 { gap: 0.25rem; }
       .gap-2 { gap: 0.5rem; }
+      .w-16 { width: 4rem; }
       .w-20 { width: 5rem; }
+      .w-32 { width: 8rem; }
+      .h-16 { height: 4rem; }
       .h-24 { height: 6rem; }
       .h-20 { height: 5rem; }
       .h-28 { height: 7rem; }
       .h-36 { height: 9rem; }
       .h-40 { height: 10rem; }
+      .max-w-full { max-width: 100%; }
+      .max-h-full { max-height: 100%; }
+      .object-contain { object-fit: contain; }
+      .block { display: block; }
+      .relative { position: relative; }
       
       .rounded { border-radius: 0.25rem; }
       
@@ -1180,9 +1210,14 @@ const getPrintStyles = (settings: PrintSettings): string => {
         left: 0;
         right: 0;
         bottom: 0;
-        outline: 1px dashed rgba(0,0,0,0.4);
+        outline: 0.5px dashed rgba(0,0,0,0.4);
         outline-offset: ${tagGap / 2}mm;
         pointer-events: none;
+      }
+      
+      /* Hide cutting guides for Single Layout */
+      .size-single .price-tag::after {
+        display: none;
       }
     `;
 }
@@ -1193,12 +1228,14 @@ export const printPriceTags = async (products: Product[], employeeName: string, 
   const abbreviatedEmployeeName = abbreviateName(employeeName);
   const allTags = products.flatMap(p => Array(p.quantity).fill(p)).map(p => generatePriceTagHTML(p, abbreviatedEmployeeName, settings));
   
+  if (allTags.length === 0) {
+      return; // Nothing to print
+  }
+
   const { cols, rows, sizeClass } = getLayoutConfig(settings.tagsPerPage);
   const commonStyles = getPrintStyles(settings);
 
-  if (isMobile && typeof jspdf !== 'undefined' && typeof html2canvas !== 'undefined') {
-    const { jsPDF } = jspdf;
-
+  if (isMobile && typeof jsPDF !== 'undefined' && typeof html2canvas !== 'undefined') {
     const renderContainer = document.createElement('div');
     renderContainer.style.position = 'fixed';
     renderContainer.style.top = '0';

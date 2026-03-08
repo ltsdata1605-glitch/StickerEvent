@@ -1,14 +1,17 @@
 
 
-import React from 'react';
-import { PrintSettings } from '../services/printService';
+import React, { useState } from 'react';
+import { PrintSettings, ModernLayoutPositions } from '../services/printService';
 import { XIcon } from './Icons';
+import ModernLayoutEditorModal from './ModernLayoutEditorModal';
 
 interface LayoutSelectionModalProps {
     onSelect: (tagsPerPage: PrintSettings['tagsPerPage']) => void;
     onClose: () => void;
     stickerStyle: 'default' | 'modern';
     onStickerStyleChange: (style: 'default' | 'modern') => void;
+    modernPositions?: ModernLayoutPositions;
+    onModernPositionsChange: (positions: ModernLayoutPositions) => void;
 }
 
 const LayoutOptionButton: React.FC<{
@@ -26,7 +29,9 @@ const LayoutOptionButton: React.FC<{
     </button>
 );
 
-const LayoutSelectionModal: React.FC<LayoutSelectionModalProps> = ({ onSelect, onClose, stickerStyle, onStickerStyleChange }) => {
+const LayoutSelectionModal: React.FC<LayoutSelectionModalProps> = ({ onSelect, onClose, stickerStyle, onStickerStyleChange, modernPositions, onModernPositionsChange }) => {
+    const [isEditorOpen, setIsEditorOpen] = useState(false);
+
     const options: { value: PrintSettings['tagsPerPage']; label: string; description: string }[] = [
         { value: 1, label: '1 Sticker / Trang', description: 'CE, QĐH, Quạt lớn, MLN' },
         { value: 2, label: '2 Sticker / Trang', description: 'Bộ lau nhà, Bếp đôi, Lò vi sóng, Lò nướng' },
@@ -68,17 +73,30 @@ const LayoutSelectionModal: React.FC<LayoutSelectionModalProps> = ({ onSelect, o
                             />
                             <span className="text-sm font-medium text-slate-800">Kiểu có sẵn</span>
                         </label>
-                        <label className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors border ${stickerStyle === 'modern' ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>
-                            <input
-                                type="radio"
-                                name="stickerStyle"
-                                value="modern"
-                                checked={stickerStyle === 'modern'}
-                                onChange={() => onStickerStyleChange('modern')}
-                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500"
-                            />
-                            <span className="text-sm font-medium text-slate-800">Kiểu hiện đại</span>
-                        </label>
+                        <div className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors border ${stickerStyle === 'modern' ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>
+                            <label className="flex items-center gap-3 cursor-pointer flex-grow">
+                                <input
+                                    type="radio"
+                                    name="stickerStyle"
+                                    value="modern"
+                                    checked={stickerStyle === 'modern'}
+                                    onChange={() => onStickerStyleChange('modern')}
+                                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <span className="text-sm font-medium text-slate-800">Kiểu hiện đại</span>
+                            </label>
+                            {stickerStyle === 'modern' && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsEditorOpen(true);
+                                    }}
+                                    className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 px-2 py-1 rounded transition-colors"
+                                >
+                                    Chỉnh sửa
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -97,6 +115,13 @@ const LayoutSelectionModal: React.FC<LayoutSelectionModalProps> = ({ onSelect, o
                     </div>
                 </div>
             </div>
+
+            <ModernLayoutEditorModal
+                isOpen={isEditorOpen}
+                onClose={() => setIsEditorOpen(false)}
+                positions={modernPositions!}
+                onSave={onModernPositionsChange}
+            />
         </div>
     );
 };

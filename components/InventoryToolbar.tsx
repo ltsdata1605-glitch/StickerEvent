@@ -8,8 +8,7 @@ interface InventoryToolbarProps {
     maSieuThi: string[];
     nganhHang: string[];
     nhomHang: string[];
-    maSanPham: string;
-    tenSanPham: string;
+    keyword: string;
   };
   useInventoryQuantity: boolean;
   onFilterChange: (key: string, value: string | string[]) => void;
@@ -57,7 +56,7 @@ const InventoryToolbar: React.FC<InventoryToolbarProps> = ({
           Xóa bộ lọc
         </button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <MultiSelectDropdown
           label="Mã siêu thị"
           options={options.maSieuThi}
@@ -83,23 +82,12 @@ const InventoryToolbar: React.FC<InventoryToolbarProps> = ({
         />
 
         <div className="space-y-1">
-          <label className="text-xs font-semibold text-slate-500">Mã sản phẩm</label>
+          <label className="text-xs font-semibold text-slate-500">Tìm kiếm (Mã/Tên SP)</label>
           <input 
             type="text"
-            value={filters.maSanPham}
-            onChange={(e) => onFilterChange('maSanPham', e.target.value)}
-            placeholder="Tìm mã SP..."
-            className="w-full text-base sm:text-sm border-slate-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 min-h-[42px] sm:min-h-[38px]"
-          />
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-xs font-semibold text-slate-500">Tên sản phẩm</label>
-          <input 
-            type="text"
-            value={filters.tenSanPham}
-            onChange={(e) => onFilterChange('tenSanPham', e.target.value)}
-            placeholder="Tìm tên SP..."
+            value={filters.keyword}
+            onChange={(e) => onFilterChange('keyword', e.target.value)}
+            placeholder="Nhập mã hoặc tên sản phẩm..."
             className="w-full text-base sm:text-sm border-slate-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 min-h-[42px] sm:min-h-[38px]"
           />
         </div>

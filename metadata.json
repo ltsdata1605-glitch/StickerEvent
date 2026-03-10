@@ -1,5 +1,5 @@
 {
-  "name": "Remix:ingiaevent_Tools910_Cải tiến Sticker",
+  "name": "stickerevent",
   "description": "An application to upload a product data file (Excel) and search for specific products by their code. It displays detailed product information including calculated bonuses.",
   "requestFramePermissions": [
     "camera"

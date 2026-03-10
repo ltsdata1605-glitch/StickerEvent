@@ -58,12 +58,15 @@ const SearchBar: React.FC<SearchBarProps> = ({
                     <li
                         key={suggestion.msp}
                         onClick={() => onSuggestionClick(suggestion)}
-                        className="px-4 py-2 cursor-pointer hover:bg-indigo-50 transition-colors"
+                        className="px-4 py-3 cursor-pointer hover:bg-indigo-50 transition-colors border-b border-slate-100 last:border-0 flex items-center justify-between"
                         tabIndex={0}
                         onKeyDown={(e) => e.key === 'Enter' && onSuggestionClick(suggestion)}
                     >
-                        <p className="font-semibold text-slate-800 truncate" title={suggestion.sanPham}>{suggestion.sanPham}</p>
-                        <p className="text-sm text-slate-500">MSP: {suggestion.msp}</p>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-slate-800 truncate" title={suggestion.sanPham}>{suggestion.sanPham}</p>
+                            <p className="text-sm text-slate-500">MSP: {suggestion.msp}</p>
+                        </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-chevron-right text-slate-400 flex-shrink-0 ml-2"><path d="m9 18 6-6-6-6"/></svg>
                     </li>
                 ))}
                 {showNoResults && (

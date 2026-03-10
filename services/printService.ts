@@ -3,6 +3,24 @@ import { parseCurrency } from './fileParser';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
+export interface ModernLayoutPositions {
+  productName: { x: number; y: number; w: number; h: number };
+  qrCode: { x: number; y: number; w: number; h: number };
+  originalPrice: { x: number; y: number; w: number; h: number };
+  savingsBox: { x: number; y: number; w: number; h: number };
+  finalPrice: { x: number; y: number; w: number; h: number };
+  footer: { x: number; y: number; w: number; h: number };
+}
+
+export const defaultModernPositions: ModernLayoutPositions = {
+  productName: { x: 200, y: 45, w: 580, h: 100 },
+  qrCode: { x: 650, y: 400, w: 120, h: 120 },
+  originalPrice: { x: 100, y: 160, w: 400, h: 80 },
+  savingsBox: { x: 100, y: 240, w: 300, h: 80 },
+  finalPrice: { x: 100, y: 320, w: 500, h: 180 },
+  footer: { x: 0, y: 400, w: 650, h: 120 },
+};
+
 export interface PrintSettings {
   showOriginalPrice: boolean;
   showPromotion: boolean;
@@ -109,10 +127,6 @@ const generateModernPriceTagHTML = (product: Product, employeeName: string, sett
     
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(product.msp)}`;
     
-    const printTimestamp = new Date().toLocaleString('vi-VN', {
-        hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit'
-    }).replace(',', '');
-    
     // Dynamic styles for the wrapper to match aspect ratio
     const wrapperStyle = `width: ${contentWidth}px; height: ${contentHeight}px; transform: scale(${scale});`;
     const borderStyle = `width: ${contentWidth}px; height: ${contentHeight}px;`;
@@ -140,7 +154,7 @@ const generateModernPriceTagHTML = (product: Product, employeeName: string, sett
                     <!-- ProductContent -->
                     <div class="p-modern-body flex-grow">
                         <!-- Product Header -->
-                        <header class="mb-0 h-header-fixed flex items-start justify-end gap-2 pl-14 pt-1 pr-2">
+                        <header class="mb-0 h-header-fixed flex items-start justify-end gap-2 pl-10 pt-1 pr-2">
                             ${(() => {
                                 const nameLen = product.sanPham.length;
                                 let titleClass = 'text-3xl';
@@ -150,7 +164,7 @@ const generateModernPriceTagHTML = (product: Product, employeeName: string, sett
                                 else titleClass = 'text-2xl';
                                 
                                 return `
-                                <h1 class="${titleClass} font-bold leading-tight uppercase line-clamp-2 flex-grow text-right">
+                                <h1 class="${titleClass} font-bold leading-tight uppercase line-clamp-2 flex-grow text-right max-w-product">
                                     ${product.sanPham}
                                 </h1>
                                 `;
@@ -212,12 +226,12 @@ const generateModernPriceTagHTML = (product: Product, employeeName: string, sett
                                 const lineCount = promoLines.length;
                                 
                                 let fontSizeClass = 'text-5xl';
-                                if (totalLength > 120 || lineCount > 4) fontSizeClass = 'text-xl';
-                                else if (totalLength > 80 || lineCount > 3) fontSizeClass = 'text-2xl';
-                                else if (totalLength > 50 || lineCount > 2) fontSizeClass = 'text-3xl';
-                                else if (totalLength > 30) fontSizeClass = 'text-4xl';
-                                else if (totalLength < 15 && lineCount === 1) fontSizeClass = 'text-7xl';
-                                else if (totalLength < 25) fontSizeClass = 'text-6xl';
+                                if (totalLength > 80 || lineCount > 3) fontSizeClass = 'text-xl';
+                                else if (totalLength > 50 || lineCount > 2) fontSizeClass = 'text-2xl';
+                                else if (totalLength > 35 || lineCount > 1) fontSizeClass = 'text-3xl';
+                                else if (totalLength > 20) fontSizeClass = 'text-4xl';
+                                else if (totalLength < 12) fontSizeClass = 'text-7xl';
+                                else fontSizeClass = 'text-5xl';
                                 
                                 return promoLines.map(line => `
                                     <p class="${fontSizeClass} font-bold text-center uppercase leading-tight-promo modern-primary-font w-full m-0 mb-0-5">
@@ -235,8 +249,7 @@ const generateModernPriceTagHTML = (product: Product, employeeName: string, sett
                             </div>
                             ` : ''}
                             <div class="text-[8px] uppercase text-center leading-none shrink-0 w-full overflow-hidden whitespace-nowrap text-ellipsis">
-                                <p class="m-0 mb-0-5 overflow-hidden text-ellipsis">${employeeInfoString}</p>
-                                <p class="m-0">${printTimestamp}</p>
+                                <p class="m-0 overflow-hidden text-ellipsis">${employeeInfoString}</p>
                             </div>
                         </div>
                     </footer>
@@ -358,14 +371,9 @@ const generatePriceTagHTML = (product: Product, employeeName: string, settings: 
   }
   tagClasses.push(finalPriceClass.replace('price-', 'price-context-'));
 
-  const printTimestamp = new Date().toLocaleString('vi-VN', {
-    hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit'
-  }).replace(',', '');
-  
-  // Ghost bar (left) and Timestamp (right) for symmetry
+  // Ghost bar (left) and Empty container (right) for symmetry
   const ghostBarHTML = `<div class="ghost-bar"></div>`;
   const timestampHTML = `<div class="vertical-info-container">
-      <div class="vertical-text">Ngày in: ${printTimestamp}</div>
   </div>`;
 
   return `
@@ -552,10 +560,10 @@ const getPrintStyles = (settings: PrintSettings): string => {
         background-color: black;
         color: white;
         text-align: center;
-        width: 300px;
+        width: 400px;
         padding: 12px 0;
         top: 45px;
-        left: -75px;
+        left: -130px;
         transform: rotate(-45deg);
         font-weight: 900;
         font-size: 2.5rem;
@@ -568,7 +576,9 @@ const getPrintStyles = (settings: PrintSettings): string => {
       .pl-24 { padding-left: 6rem; }
       .pl-20 { padding-left: 5rem; }
       .pl-14 { padding-left: 3.5rem; }
+      .pl-10 { padding-left: 2.5rem; }
       .pr-4 { padding-right: 1rem; }
+      .max-w-product { max-width: 580px; }
       .text-right { text-align: right; }
       .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
       .text-2xl { font-size: 1.5rem; line-height: 2rem; }
@@ -1218,6 +1228,9 @@ const getPrintStyles = (settings: PrintSettings): string => {
       /* Hide cutting guides for Single Layout */
       .size-single .price-tag::after {
         display: none;
+      }
+      .size-single .price-tag.modern {
+        border: none;
       }
     `;
 }

@@ -1,8 +1,9 @@
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, Component } from 'react';
 import { Product, InventoryItem } from './types';
-import { PrintSettings } from './services/printService';
+import { PrintSettings, defaultModernPositions, ModernLayoutPositions } from './services/printService';
 import { parseProductFile, saveData, loadData, clearData, saveEmployeeName, parseCurrency, saveDisplayedProducts, parseInventoryFile, saveInventoryData } from './services/fileParser';
+import { uploadProductsToFirestore, uploadInventoryToFirestore, fetchProductsFromFirestore, fetchInventoryFromFirestore, saveListToFirestore, saveUserState, fetchUserState } from './services/firebaseService';
 import { printPriceTags } from './services/printService';
 import * as XLSX from 'xlsx';
 import ResultsDisplay from './components/ResultsDisplay';
@@ -14,8 +15,78 @@ import ManualInputModal from './components/ManualInputModal';
 import ControlPanel from './components/ControlPanel';
 import PdfPreviewModal from './components/PdfPreviewModal';
 import InventoryToolbar from './components/InventoryToolbar';
+import BottomNavigation from './components/BottomNavigation';
+import Login from './components/Login';
+import UserManagementModal from './components/UserManagementModal';
+import ChangePasswordModal from './components/ChangePasswordModal';
+import SavedListsModal from './components/SavedListsModal';
+import SaveListModal from './components/SaveListModal';
+import AlertModal from './components/AlertModal';
+import SuperAdminModal from './components/SuperAdminModal';
+import { User } from 'firebase/auth';
+import { auth, db } from './firebase';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { clearStoreDataOnFirestore, validateConnection } from './services/firebaseService';
+
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: any;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("Uncaught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      let displayMessage = "Đã xảy ra lỗi không mong muốn.";
+      try {
+        const errObj = JSON.parse(this.state.error.message);
+        if (errObj.error) displayMessage = `Lỗi Firestore: ${errObj.error} (${errObj.operationType} at ${errObj.path})`;
+      } catch (e) {
+        displayMessage = this.state.error?.message || displayMessage;
+      }
+
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
+          <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-red-100">
+            <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mb-4 mx-auto">
+              <WarningIcon className="h-6 w-6 text-red-600" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 text-center mb-2">Rất tiếc, đã có lỗi xảy ra</h2>
+            <p className="text-slate-600 text-center mb-6">{displayMessage}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+            >
+              Tải lại trang
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 export default function App(): React.JSX.Element {
+  const [user, setUser] = useState<User | null>(null);
+  const [userData, setUserData] = useState<any>(null);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -23,14 +94,12 @@ export default function App(): React.JSX.Element {
     maSieuThi: string[];
     nganhHang: string[];
     nhomHang: string[];
-    maSanPham: string;
-    tenSanPham: string;
+    keyword: string;
   }>({
     maSieuThi: [],
     nganhHang: [],
     nhomHang: [],
-    maSanPham: '',
-    tenSanPham: ''
+    keyword: ''
   });
   const [useInventoryQuantity, setUseInventoryQuantity] = useState(false);
   const [displayedProducts, setDisplayedProducts] = useState<Product[]>([]);
@@ -54,12 +123,33 @@ export default function App(): React.JSX.Element {
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'home' | 'tools'>('home');
+  const [isSavedListsModalOpen, setIsSavedListsModalOpen] = useState(false);
+  const [isSaveListModalOpen, setIsSaveListModalOpen] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; message: string; title?: string }>({
+    isOpen: false,
+    message: '',
+    title: 'Thông báo'
+  });
+
+  const showAlert = (message: string, title: string = "Thông báo") => {
+    setAlertConfig({ isOpen: true, message, title });
+  };
 
   useEffect(() => {
     setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
   }, []);
 
   const [isPrintSettingsOpen, setIsPrintSettingsOpen] = useState(false);
+  const [modernPositions, setModernPositions] = useState<ModernLayoutPositions>(() => {
+    const saved = localStorage.getItem('modernPositions');
+    return saved ? JSON.parse(saved) : defaultModernPositions;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('modernPositions', JSON.stringify(modernPositions));
+  }, [modernPositions]);
+
   const [printSettings, setPrintSettings] = useState<PrintSettings>(() => {
     // Default settings with all options enabled.
     const masterDefaults: PrintSettings = {
@@ -107,6 +197,9 @@ export default function App(): React.JSX.Element {
   const [productToPrint, setProductToPrint] = useState<Product | null>(null);
   const [productsForPrintingSession, setProductsForPrintingSession] = useState<Product[]>([]);
   const [isManualInputOpen, setIsManualInputOpen] = useState(false);
+  const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
+  const [isSuperAdminModalOpen, setIsSuperAdminModalOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -118,11 +211,34 @@ export default function App(): React.JSX.Element {
 
   useEffect(() => {
     const initializeApp = async () => {
+      // Load local settings first (employee name, etc.)
       const savedData = await loadData();
+      
+      // Load user-specific state from Firestore
+      let userState = null;
+      if (user) {
+        userState = await fetchUserState(user.uid);
+      }
+
       if (savedData) {
-        setAllProducts(savedData.products || []);
-        setInventory(savedData.inventory || []);
-        setDisplayedProducts(savedData.displayedProducts || []);
+        // Prefer Firestore state for displayedProducts if it exists
+        if (userState && userState.displayedProducts) {
+          setDisplayedProducts(userState.displayedProducts);
+        } else if (user) {
+          // If logged in but no Firestore state AND we are initializing for a new user,
+          // we MUST clear the local state to prevent data leak from previous session
+          setDisplayedProducts([]);
+          setAllProducts([]);
+          setInventory([]);
+        } else {
+          setDisplayedProducts(savedData.displayedProducts || []);
+        }
+
+        // Apply inventory filters from Firestore if they exist
+        if (userState && userState.inventoryFilters) {
+          setInventoryFilters(userState.inventoryFilters);
+        }
+
         if(savedData.fileInfo && savedData.fileInfo.fileName) {
           const savedFileNames = savedData.fileInfo.fileName;
           const fileList = savedFileNames.split(',').map(f => f.trim()).filter(Boolean);
@@ -135,27 +251,125 @@ export default function App(): React.JSX.Element {
           setFileExportDate(savedData.fileInfo.fileExportDate);
         }
         setInventoryUploadTimestamp(savedData.inventoryUploadTimestamp ? new Date(savedData.inventoryUploadTimestamp) : null);
-        const name = savedData.employeeName || '';
+        
+        // Default employee name to username or email if available
+        let defaultName = userData?.username || '';
+        if (defaultName === '21707' || defaultName === 'lts.truongson') {
+            defaultName = ''; // Force Super Admin to enter their name
+        } else if (!defaultName && userData?.email) {
+            defaultName = userData.email.split('@')[0];
+        }
+        
+        const name = defaultName || savedData.employeeName || '';
         setEmployeeName(name);
         if (!name) {
           setIsEditingEmployeeName(true);
         }
       } else {
-        setIsEditingEmployeeName(true);
+        // New user or cleared local data
+        setDisplayedProducts([]);
+        
+        let defaultName = userData?.username || '';
+        if (defaultName === '21707' || defaultName === 'lts.truongson') {
+            defaultName = '';
+        } else if (!defaultName && userData?.email) {
+            defaultName = userData.email.split('@')[0];
+        }
+        setEmployeeName(defaultName);
+        setIsEditingEmployeeName(!defaultName);
       }
-      setIsInitializing(false);
+
+      // Load data from Firestore if user is logged in
+      if (user && userData && userData.storeId) {
+        loadFirestoreData(userData.storeId);
+      } else {
+        setIsInitializing(false);
+      }
     };
-    initializeApp();
-  }, []);
+    
+    if (user) {
+        initializeApp();
+    } else {
+        setIsInitializing(false);
+    }
+  }, [user, userData]);
+
+  const loadFirestoreData = async (storeId: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Verify store has an admin (for Staff users)
+      if (userData?.role === 'staff') {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('storeId', '==', storeId), where('role', '==', 'admin'), limit(1));
+        const adminCheckSnapshot = await getDocs(q);
+        if (adminCheckSnapshot.empty) {
+          setError(`Mã kho "${storeId}" hiện không có Quản trị viên quản lý. Bạn không thể xem dữ liệu.`);
+          setAllProducts([]);
+          setInventory([]);
+          setIsLoading(false);
+          setIsInitializing(false);
+          return;
+        }
+      }
+
+      const [firestoreProducts, firestoreInventory] = await Promise.all([
+        fetchProductsFromFirestore(storeId),
+        fetchInventoryFromFirestore(storeId)
+      ]);
+      
+      if (firestoreProducts.length > 0) {
+        setAllProducts(firestoreProducts);
+      }
+
+      if (firestoreInventory.length > 0) {
+        setInventory(firestoreInventory);
+      }
+
+    } catch (err: any) {
+      console.error("Error loading from Firestore:", err);
+      let displayError = "Lỗi tải dữ liệu từ server. Vui lòng kiểm tra kết nối mạng hoặc quyền truy cập.";
+      try {
+        const errObj = JSON.parse(err.message);
+        if (errObj.error) {
+          displayError = `Lỗi hệ thống: ${errObj.error}`;
+          if (errObj.error.includes('insufficient permissions')) {
+            displayError = "Bạn không có quyền truy cập dữ liệu của kho này. Vui lòng liên hệ Admin để kiểm tra quyền hạn.";
+          }
+        }
+      } catch (e) {
+        // Not a JSON error
+        if (err.message) displayError = err.message;
+      }
+      setError(displayError);
+    } finally {
+      setIsLoading(false);
+      setIsInitializing(false);
+    }
+  };
 
   useEffect(() => {
     // Do not save to DB during initial load, wait for data to be restored first.
     if (!isInitializing) {
       saveDisplayedProducts(displayedProducts);
+      
+      // Save user state to Firestore
+      if (user) {
+        saveUserState(user.uid, {
+          displayedProducts,
+          inventoryFilters
+        });
+      }
     }
-  }, [displayedProducts, isInitializing]);
+  }, [displayedProducts, inventoryFilters, isInitializing, user]);
 
   const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role !== 'admin') {
+        showAlert("Chỉ quản trị viên mới có quyền tải file bảng giá.");
+        return;
+    }
+
     const files = event.target.files;
     if (files && files.length > 0) {
       setIsLoading(true);
@@ -221,11 +435,18 @@ export default function App(): React.JSX.Element {
         setUploadTimestamp(newUploadTimestamp);
         setFileExportDate(latestExportDate);
         
+        // Save to Local IndexedDB
         await saveData(combinedProducts, {
           fileName: fileNamesForStorage,
           uploadTimestamp: newUploadTimestamp,
           fileExportDate: latestExportDate
         });
+
+        // Upload to Firestore
+        if (userData && userData.storeId) {
+            await uploadProductsToFirestore(userData.storeId, combinedProducts);
+        }
+
       } catch (err) {
         setError('Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.');
         console.error(err);
@@ -236,9 +457,14 @@ export default function App(): React.JSX.Element {
         }
       }
     }
-  }, []);
+  }, [userData]);
   
   const handleInventoryFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role !== 'admin') {
+        showAlert("Chỉ quản trị viên mới có quyền tải file tồn kho.");
+        return;
+    }
+
     const file = event.target.files?.[0];
     if (file) {
       setIsLoading(true);
@@ -248,7 +474,15 @@ export default function App(): React.JSX.Element {
         const newTimestamp = new Date();
         setInventory(items);
         setInventoryUploadTimestamp(newTimestamp);
+        
+        // Save to Local IndexedDB
         await saveInventoryData(items, newTimestamp);
+
+        // Upload to Firestore
+        if (userData && userData.storeId) {
+            await uploadInventoryToFirestore(userData.storeId, items);
+        }
+
         setError(null);
       } catch (err) {
         setError('Lỗi khi xử lý file tồn kho. Vui lòng kiểm tra định dạng file.');
@@ -258,7 +492,7 @@ export default function App(): React.JSX.Element {
         if (event.target) event.target.value = '';
       }
     }
-  }, []);
+  }, [userData]);
 
   const handleDownloadSampleInventory = useCallback(() => {
     if (inventory.length === 0) return;
@@ -333,28 +567,30 @@ export default function App(): React.JSX.Element {
       maSieuThi: [],
       nganhHang: [],
       nhomHang: [],
-      maSanPham: '',
-      tenSanPham: ''
+      keyword: ''
     });
   }, []);
 
   // Effect to apply inventory filters
   useEffect(() => {
-    const { maSieuThi, nganhHang, nhomHang, maSanPham, tenSanPham } = inventoryFilters;
+    const { maSieuThi, nganhHang, nhomHang, keyword } = inventoryFilters;
     
     // If no filters are active, don't auto-update displayedProducts 
     // (unless we want to show everything, but that's usually too much)
-    if (maSieuThi.length === 0 && nganhHang.length === 0 && nhomHang.length === 0 && !maSanPham && !tenSanPham) {
+    if (maSieuThi.length === 0 && nganhHang.length === 0 && nhomHang.length === 0 && !keyword) {
       return;
     }
 
     const filteredInventory = inventory.filter(item => {
+      const keywordLower = keyword.toLowerCase();
       return (
         (maSieuThi.length === 0 || maSieuThi.includes(item.maSieuThi)) &&
         (nganhHang.length === 0 || nganhHang.includes(item.nganhHang)) &&
         (nhomHang.length === 0 || nhomHang.includes(item.nhomHang)) &&
-        (!maSanPham || item.maSanPham.toLowerCase().includes(maSanPham.toLowerCase())) &&
-        (!tenSanPham || item.tenSanPham.toLowerCase().includes(tenSanPham.toLowerCase()))
+        (!keyword || 
+          item.maSanPham.toLowerCase().includes(keywordLower) || 
+          item.tenSanPham.toLowerCase().includes(keywordLower)
+        )
       );
     });
 
@@ -599,34 +835,13 @@ export default function App(): React.JSX.Element {
 
   const executeReset = useCallback(async () => {
     setDisplayedProducts([]); // Direct update to empty array
+    saveDisplayedProducts([]);
     setSearchQuery('');
     setSuggestions([]);
     setShowNoResults(false);
     setDuplicateError(false);
     setError(null);
     setIsResetConfirmOpen(false);
-    
-    // Clear all files and inventory data
-    setAllProducts([]);
-    setInventory([]);
-    setFileName(null);
-    setUploadTimestamp(null);
-    setInventoryUploadTimestamp(null);
-    setInventoryFilters({
-      maSieuThi: [],
-      nganhHang: [],
-      nhomHang: [],
-      maSanPham: '',
-      tenSanPham: ''
-    });
-    
-    // Clear from indexedDB
-    try {
-      await saveData([], null);
-      await saveInventoryData([], null);
-    } catch (err) {
-      console.error('Error clearing data from IndexedDB:', err);
-    }
   }, []);
 
   const handleReset = () => {
@@ -776,6 +991,66 @@ export default function App(): React.JSX.Element {
     setIsLayoutModalOpen(true);
   };
 
+  const handleSaveList = () => {
+    if (!user || !userData?.storeId) {
+      showAlert('Vui lòng đăng nhập để sử dụng tính năng này.');
+      return;
+    }
+    if (displayedProducts.length === 0) {
+      showAlert('Không có sản phẩm nào để lưu.');
+      return;
+    }
+    setIsSaveListModalOpen(true);
+  };
+
+  const onConfirmSaveList = async (listName: string) => {
+    setIsSaveListModalOpen(false);
+    try {
+      setIsLoading(true);
+      const itemsToSave = displayedProducts.map(p => ({
+        msp: p.msp,
+        quantity: p.quantity,
+      }));
+      await saveListToFirestore(userData.storeId, user.uid, listName, itemsToSave);
+      showAlert('Đã lưu danh sách thành công!');
+    } catch (err) {
+      console.error('Error saving list:', err);
+      showAlert('Có lỗi xảy ra khi lưu danh sách. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const isSuperAdmin = userData?.username === 'admin' || userData?.username === '21707' || user?.email === 'lts.truongson@gmail.com' || user?.email === 'lts.truongson@example.com' || user?.email === 'admin@example.com';
+
+  const handleViewSavedLists = () => {
+    if (!user || !userData?.storeId) {
+      showAlert('Vui lòng đăng nhập để xem danh sách đã lưu.');
+      return;
+    }
+    setIsSavedListsModalOpen(true);
+  };
+
+  const handleLoadSavedList = (savedItems: any[]) => {
+    const reconstructedProducts: Product[] = [];
+    for (const item of savedItems) {
+      const product = allProducts.find(p => p.msp === item.msp);
+      if (product) {
+        reconstructedProducts.push({ ...product, quantity: item.quantity || 1, selected: false });
+      } else if (item.sanPham) {
+        // Fallback for older saved lists that had full product info
+        reconstructedProducts.push({ ...item, selected: false });
+      }
+    }
+    
+    if (reconstructedProducts.length === 0) {
+        showAlert('Không tìm thấy sản phẩm nào trong danh sách này (có thể do dữ liệu gốc đã bị xóa).');
+        return;
+    }
+    
+    setDisplayedProducts(reconstructedProducts);
+    saveDisplayedProducts(reconstructedProducts);
+  };
 
   if (isInitializing) {
      return (
@@ -785,177 +1060,296 @@ export default function App(): React.JSX.Element {
      );
   }
 
+  if (!user) {
+    return <Login onLoginSuccess={(user, data) => {
+      setUser(user);
+      setUserData(data);
+    }} />;
+  }
+
   return (
-    <div className={`min-h-screen bg-slate-100 text-slate-800 flex flex-col items-center p-4 sm:p-6 lg:p-8 ${isMobile ? 'pb-24' : ''}`}>
-      <div className="w-full max-w-7xl mx-auto">
-        <header className="text-center mb-8">
-          <div className="flex items-center justify-center gap-4 mb-2">
-            <LogoIcon className="h-10 w-10 text-indigo-600" />
-            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
-              CÔNG CỤ IN STICKER SẢN PHẨM EVENT
-            </h1>
-          </div>
-          <p className="text-slate-600 text-lg">
-            Tải file in bảng giá và tìm sản phẩm cần in sticker.
-          </p>
-        </header>
-
-        <main className="flex flex-col lg:flex-row gap-8">
-          <ControlPanel 
-            employeeName={employeeName}
-            isEditingEmployeeName={isEditingEmployeeName}
-            searchQuery={searchQuery}
-            suggestions={suggestions}
-            showNoResults={showNoResults}
-            allProducts={allProducts}
-            displayedProducts={displayedProducts}
-            isLoading={isLoading}
-            fileName={fileName}
-            isMobile={isMobile}
-            uploadTimestamp={uploadTimestamp}
-            inventoryUploadTimestamp={inventoryUploadTimestamp}
-            hasInventory={inventory.length > 0}
-            onEmployeeNameChange={handleEmployeeNameChange}
-            onSaveEmployeeName={handleSaveEmployeeName}
-            onEmployeeNameKeyDown={handleEmployeeNameKeyDown}
-            onSetIsEditingEmployeeName={setIsEditingEmployeeName}
-            onSearchChange={handleSearchInputChange}
-            onOpenScanner={() => setIsScannerOpen(true)}
-            onSuggestionClick={handleSuggestionClick}
-            onFileChange={handleFileChange}
-            onInventoryFileChange={handleInventoryFileChange}
-            onDownloadSampleInventory={handleDownloadSampleInventory}
-            onShowTopBonus={handleShowTopBonus}
-            onShowTopDiscount={handleShowTopDiscount}
-            onOpenManualInput={() => setIsManualInputOpen(true)}
-            onReset={handleReset}
-            onTriggerImport={handleTriggerImport}
-            onExport={handleExport}
-            onOpenPrintSettings={() => setIsPrintSettingsOpen(true)}
-            onPrintSelected={handlePrintSelected}
-            onPrintAll={handlePrintAll}
-          />
-          <div className="flex-1 space-y-4">
-             {isLoading && (
-                <div className="text-center p-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
-                  <p className="mt-2 text-slate-600">Đang xử lý tệp...</p>
+    <ErrorBoundary>
+      <div className={`min-h-screen bg-white text-slate-800 flex flex-col items-center p-4 sm:p-6 lg:p-8 ${isMobile ? 'pb-24' : ''}`}>
+        <div className="w-full max-w-7xl mx-auto">
+          <header className="mb-8">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="bg-indigo-50 p-2 rounded-lg">
+                  <LogoIcon className="h-8 w-8 text-indigo-600" />
                 </div>
-              )}
-              {error && (
-                <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md" role="alert">
-                  <p className="font-bold">Lỗi</p>
-                  <p className="whitespace-pre-wrap">{error}</p>
-                </div>
-              )}
-              {duplicateError && (
-                  <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded-md" role="alert">
-                      <p className="font-bold">Sản phẩm đã có</p>
-                      <p>Sản phẩm này đã có trong danh sách kết quả của bạn.</p>
+                <div>
+                  <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 tracking-tight leading-tight">
+                    CÔNG CỤ IN STICKER SẢN PHẨM EVENT
+                  </h1>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${userData?.role === 'admin' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                        {userData?.role === 'admin' ? 'Quản trị viên' : 'Nhân viên'}
+                    </span>
+                    {userData?.storeId && (
+                        <span className="text-[10px] font-medium text-slate-500">Cửa hàng: {userData.storeId}</span>
+                    )}
                   </div>
-              )}
-
-            <input type="file" ref={importInputRef} onChange={handleImport} accept=".json" className="hidden" multiple />
-
-            <InventoryToolbar 
-              inventory={inventory}
-              filters={inventoryFilters}
-              useInventoryQuantity={useInventoryQuantity}
-              onFilterChange={handleInventoryFilterChange}
-              onClearFilters={handleClearInventoryFilters}
-              onUseInventoryQuantityChange={handleUseInventoryQuantityChange}
-            />
-
-            <ResultsDisplay 
-              results={displayedProducts} 
-              hasData={allProducts.length > 0} 
-              highlightedMsp={highlightedMsp}
-              onToggleSelect={handleToggleSelect}
-              onQuantityChange={handleQuantityChange}
-              onSetQuantity={handleSetQuantity}
-              onPrintSingle={handlePrintSingle}
-              isMobile={isMobile}
-            />
-          </div>
-        </main>
-      </div>
-
-      {isScannerOpen && (
-        <Scanner
-          onScanSuccess={handleScanSuccess}
-          onClose={() => setIsScannerOpen(false)}
-        />
-      )}
-
-      {isPrintSettingsOpen && (
-          <PrintSettingsModal
-              settings={printSettings}
-              onSettingsChange={setPrintSettings}
-              onClose={() => setIsPrintSettingsOpen(false)}
-          />
-      )}
-      
-      {isLayoutModalOpen && (
-          <LayoutSelectionModal
-              onSelect={executePrint}
-              stickerStyle={printSettings.stickerStyle || 'default'}
-              onStickerStyleChange={(style) => setPrintSettings({ ...printSettings, stickerStyle: style })}
-              modernPositions={printSettings.modernPositions}
-              onModernPositionsChange={(positions) => setPrintSettings({ ...printSettings, modernPositions: positions })}
-              onClose={() => {
-                setIsLayoutModalOpen(false);
-                setProductToPrint(null);
-                setPrintAction(null);
-                setProductsForPrintingSession([]);
-              }}
-          />
-      )}
-
-      {isManualInputOpen && (
-        <ManualInputModal
-          onPrint={handleManualPrint}
-          onClose={() => setIsManualInputOpen(false)}
-          allProducts={allProducts}
-        />
-      )}
-      
-      {pdfPreviewUrl && (
-        <PdfPreviewModal
-            url={pdfPreviewUrl}
-            fileName={`in-gia-sticker-${new Date().toISOString().slice(0, 10)}.pdf`}
-            onClose={() => setPdfPreviewUrl(null)}
-        />
-      )}
-      
-      {isResetConfirmOpen && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsResetConfirmOpen(false)}>
-            <div 
-                className="relative bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4" 
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="text-center">
-                    <WarningIcon className="mx-auto h-12 w-12 text-amber-500"/>
-                    <h2 className="text-xl font-bold text-slate-900 mt-2">Xác nhận Xóa</h2>
-                    <p className="text-slate-600 mt-1">Bạn có chắc chắn muốn xóa toàn bộ danh sách sản phẩm đã tìm/lọc không?</p>
                 </div>
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                    <button onClick={() => setIsResetConfirmOpen(false)} className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-slate-100 h-10 px-4 py-2">
-                        Hủy
-                    </button>
-                    <button onClick={executeReset} className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-red-600 text-red-50 hover:bg-red-700 h-10 px-4 py-2">
-                        Xóa
-                    </button>
-                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsChangePasswordOpen(true)}
+                  className="px-3 py-1.5 text-sm font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 hover:text-indigo-600 rounded-lg transition-colors border border-slate-200"
+                >
+                  Đổi mật khẩu
+                </button>
+                <button
+                  onClick={async () => {
+                    await auth.signOut();
+                    setUser(null);
+                    setUserData(null);
+                    setAllProducts([]);
+                    setInventory([]);
+                    setDisplayedProducts([]);
+                    setFileName(null);
+                    setUploadTimestamp(null);
+                    setInventoryUploadTimestamp(null);
+                    setFileExportDate(null);
+                    setSearchQuery('');
+                    setSuggestions([]);
+                    await clearData();
+                  }}
+                  className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-100"
+                >
+                  Đăng xuất
+                </button>
+              </div>
             </div>
-        </div>
-      )}
+          </header>
 
-      {isPrinting && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-70 flex flex-col items-center justify-center backdrop-blur-sm">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-400"></div>
-          <p className="text-white mt-4 text-lg font-medium">Đang tạo tệp PDF...</p>
+          <main className="flex flex-col lg:flex-row gap-8">
+            <ControlPanel 
+              employeeName={employeeName}
+              isEditingEmployeeName={isEditingEmployeeName}
+              searchQuery={searchQuery}
+              suggestions={suggestions}
+              showNoResults={showNoResults}
+              allProducts={allProducts}
+              displayedProducts={displayedProducts}
+              isLoading={isLoading}
+              fileName={fileName}
+              isMobile={isMobile}
+              uploadTimestamp={uploadTimestamp}
+              inventoryUploadTimestamp={inventoryUploadTimestamp}
+              hasInventory={inventory.length > 0}
+              userRole={userData?.role}
+              onEmployeeNameChange={handleEmployeeNameChange}
+              onSaveEmployeeName={handleSaveEmployeeName}
+              onEmployeeNameKeyDown={handleEmployeeNameKeyDown}
+              onSetIsEditingEmployeeName={setIsEditingEmployeeName}
+              onSearchChange={handleSearchInputChange}
+              onOpenScanner={() => setIsScannerOpen(true)}
+              onSuggestionClick={handleSuggestionClick}
+              onFileChange={handleFileChange}
+              onInventoryFileChange={handleInventoryFileChange}
+              onDownloadSampleInventory={handleDownloadSampleInventory}
+              onShowTopBonus={handleShowTopBonus}
+              onShowTopDiscount={handleShowTopDiscount}
+              onOpenManualInput={() => setIsManualInputOpen(true)}
+              onReset={handleReset}
+              onTriggerImport={handleTriggerImport}
+              onExport={handleExport}
+              onOpenPrintSettings={() => setIsPrintSettingsOpen(true)}
+              onPrintSelected={handlePrintSelected}
+              onPrintAll={handlePrintAll}
+              onOpenUserManagement={() => setIsUserManagementOpen(true)}
+              onOpenSuperAdminTools={isSuperAdmin ? () => setIsSuperAdminModalOpen(true) : undefined}
+              onSaveList={handleSaveList}
+              onViewSavedLists={handleViewSavedLists}
+              activeTab={activeTab}
+            />
+            <div className={`flex-1 space-y-4 ${isMobile && activeTab === 'tools' ? 'hidden' : ''}`}>
+               {isLoading && (
+                  <div className="text-center p-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+                    <p className="mt-2 text-slate-600">Đang xử lý tệp...</p>
+                  </div>
+                )}
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4" role="alert">
+                    <div className="flex items-center gap-3">
+                        <WarningIcon className="h-5 w-5 text-red-500 shrink-0" />
+                        <p className="text-sm font-medium">{error}</p>
+                    </div>
+                    <button 
+                        onClick={() => userData?.storeId && loadFirestoreData(userData.storeId)}
+                        className="whitespace-nowrap px-4 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-bold"
+                    >
+                        Thử lại
+                    </button>
+                  </div>
+                )}
+                {duplicateError && (
+                    <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded-md" role="alert">
+                        <p className="font-bold">Sản phẩm đã có</p>
+                        <p>Sản phẩm này đã có trong danh sách kết quả của bạn.</p>
+                    </div>
+                )}
+
+              <input type="file" ref={importInputRef} onChange={handleImport} accept=".json" className="hidden" multiple />
+
+              <InventoryToolbar 
+                inventory={inventory}
+                filters={inventoryFilters}
+                useInventoryQuantity={useInventoryQuantity}
+                onFilterChange={handleInventoryFilterChange}
+                onClearFilters={handleClearInventoryFilters}
+                onUseInventoryQuantityChange={handleUseInventoryQuantityChange}
+              />
+
+              <ResultsDisplay 
+                results={displayedProducts} 
+                hasData={allProducts.length > 0} 
+                highlightedMsp={highlightedMsp}
+                onToggleSelect={handleToggleSelect}
+                onQuantityChange={handleQuantityChange}
+                onSetQuantity={handleSetQuantity}
+                onPrintSingle={handlePrintSingle}
+                isMobile={isMobile}
+              />
+            </div>
+          </main>
         </div>
-      )}
-    </div>
+
+        {isMobile && (
+          <BottomNavigation
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            onScanClick={() => setIsScannerOpen(true)}
+            onPrintClick={handlePrintSelected}
+            onSettingsClick={() => setIsPrintSettingsOpen(true)}
+          />
+        )}
+
+        {isScannerOpen && (
+          <Scanner
+            onScanSuccess={handleScanSuccess}
+            onClose={() => setIsScannerOpen(false)}
+          />
+        )}
+
+        {isPrintSettingsOpen && (
+            <PrintSettingsModal
+                settings={printSettings}
+                onSettingsChange={setPrintSettings}
+                onClose={() => setIsPrintSettingsOpen(false)}
+            />
+        )}
+        
+        {isLayoutModalOpen && (
+            <LayoutSelectionModal
+                onSelect={executePrint}
+                stickerStyle={printSettings.stickerStyle || 'default'}
+                onStickerStyleChange={(style) => setPrintSettings({ ...printSettings, stickerStyle: style })}
+                modernPositions={modernPositions}
+                onModernPositionsChange={setModernPositions}
+                onClose={() => {
+                  setIsLayoutModalOpen(false);
+                  setProductToPrint(null);
+                  setPrintAction(null);
+                  setProductsForPrintingSession([]);
+                }}
+            />
+        )}
+
+        {isManualInputOpen && (
+          <ManualInputModal
+            onPrint={handleManualPrint}
+            onClose={() => setIsManualInputOpen(false)}
+            allProducts={allProducts}
+          />
+        )}
+
+        {isUserManagementOpen && (
+          <UserManagementModal
+            isOpen={isUserManagementOpen}
+            onClose={() => setIsUserManagementOpen(false)}
+            storeId={userData?.storeId}
+            currentUserId={user?.uid || ''}
+          />
+        )}
+
+        {isChangePasswordOpen && (
+          <ChangePasswordModal
+            isOpen={isChangePasswordOpen}
+            onClose={() => setIsChangePasswordOpen(false)}
+          />
+        )}
+        
+        {pdfPreviewUrl && (
+          <PdfPreviewModal
+              url={pdfPreviewUrl}
+              fileName={`in-gia-sticker-${new Date().toISOString().slice(0, 10)}.pdf`}
+              onClose={() => setPdfPreviewUrl(null)}
+          />
+        )}
+        
+        {isResetConfirmOpen && (
+          <div className="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsResetConfirmOpen(false)}>
+              <div 
+                  className="relative bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4" 
+                  onClick={(e) => e.stopPropagation()}
+              >
+                  <div className="text-center">
+                      <WarningIcon className="mx-auto h-12 w-12 text-amber-500"/>
+                      <h2 className="text-xl font-bold text-slate-900 mt-2">Xác nhận Xóa</h2>
+                      <p className="text-slate-600 mt-1">Bạn có chắc chắn muốn xóa toàn bộ danh sách sản phẩm đang hiển thị không? (Dữ liệu gốc trong hệ thống vẫn được giữ nguyên)</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                      <button onClick={() => setIsResetConfirmOpen(false)} className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-slate-100 h-10 px-4 py-2">
+                          Hủy
+                      </button>
+                      <button onClick={executeReset} className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-red-600 text-red-50 hover:bg-red-700 h-10 px-4 py-2">
+                          Xóa
+                      </button>
+                  </div>
+              </div>
+          </div>
+        )}
+
+        {isSavedListsModalOpen && userData?.storeId && user && (
+          <SavedListsModal
+            storeId={userData.storeId}
+            userId={user.uid}
+            isAdmin={userData.role === 'admin'}
+            onClose={() => setIsSavedListsModalOpen(false)}
+            onLoadList={handleLoadSavedList}
+          />
+        )}
+
+        {isPrinting && (
+          <div className="fixed inset-0 z-50 bg-black bg-opacity-70 flex flex-col items-center justify-center backdrop-blur-sm">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-400"></div>
+            <p className="text-white mt-4 text-lg font-medium">Đang tạo tệp PDF...</p>
+          </div>
+        )}
+
+        <SaveListModal
+          isOpen={isSaveListModalOpen}
+          onClose={() => setIsSaveListModalOpen(false)}
+          onSave={onConfirmSaveList}
+          defaultName={`Danh sách ${new Date().toLocaleDateString('vi-VN')}`}
+        />
+
+        <AlertModal
+          isOpen={alertConfig.isOpen}
+          onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
+          message={alertConfig.message}
+          title={alertConfig.title}
+        />
+
+        {isSuperAdmin && (
+          <SuperAdminModal
+            isOpen={isSuperAdminModalOpen}
+            onClose={() => setIsSuperAdminModalOpen(false)}
+          />
+        )}
+      </div>
+    </ErrorBoundary>
   );
 }

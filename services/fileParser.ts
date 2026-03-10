@@ -328,9 +328,9 @@ export const loadData = async (): Promise<{ products: Product[]; displayedProduc
 
 export const clearData = async (): Promise<void> => {
   const store = await getStore('readwrite');
-  store.delete('products');
-  store.delete('fileInfo');
-  store.delete('displayedProducts');
-  store.delete('inventory');
-  store.delete('inventoryUploadTimestamp');
+  return new Promise((resolve, reject) => {
+    const request = store.clear();
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject('Error clearing IndexedDB.');
+  });
 };

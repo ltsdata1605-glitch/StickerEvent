@@ -31,62 +31,62 @@ interface ProductCardProps {
 const ProductCard: React.FC<ProductCardProps> = ({ result, isHighlighted, onToggleSelect, onQuantityChange, onSetQuantity, onPrintSingle, isMobile }) => (
   <div 
     data-msp={result.msp}
-    className={`bg-white p-3 rounded-xl shadow-sm border hover:shadow-md hover:border-indigo-400 transition-all duration-300 ease-in-out flex flex-col fade-in ${isHighlighted ? 'animate-pulse-strong border-amber-500 border-2' : 'border-slate-200'}`}
+    className={`bg-white p-3 sm:p-4 rounded-xl shadow-sm border hover:shadow-md hover:border-indigo-400 transition-all duration-300 ease-in-out flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center fade-in ${isHighlighted ? 'animate-pulse-strong border-amber-500 border-2' : 'border-slate-200'}`}
   >
-    <div className="flex-grow">
-      {/* Header: Name, MSP, Price */}
-      <div className="flex justify-between items-start gap-2">
+    {/* Left/Top: Info */}
+    <div className="flex-1 min-w-0 w-full">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-sm text-slate-900 line-clamp-2" title={result.sanPham}>
+          <h3 className="font-bold text-sm sm:text-base text-slate-900 line-clamp-2" title={result.sanPham}>
             {result.sanPham}
           </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            <span className="font-mono bg-slate-100 text-indigo-700 px-1 py-0.5 rounded">{result.msp}</span>
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="font-mono text-xs bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded">{result.msp}</span>
+            <span className="text-xs text-slate-500">Ngày in: {result.ngayIn || '-'}</span>
+          </div>
         </div>
-        <div className="flex-shrink-0 text-right">
-          <p className="text-base font-bold text-red-600">{result.giaGiam}</p>
-          <p className="text-[10px] text-slate-400 line-through">{result.giaGoc}</p>
+        
+        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:gap-0 mt-2 sm:mt-0 w-full sm:w-auto border-t sm:border-t-0 border-slate-100 pt-2 sm:pt-0">
+          <div className="text-left sm:text-right">
+            <p className="text-base sm:text-lg font-bold text-red-600 leading-none">{result.giaGiam}</p>
+            <p className="text-[10px] sm:text-xs text-slate-400 line-through mt-0.5">{result.giaGoc}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-slate-500">Thưởng: <span className="font-bold text-violet-600">{formatCurrency(result.tongThuong)}</span></p>
+            <p className="text-[10px] text-slate-400">
+              <span className="text-green-600">ERP: {formatCurrency(result.thuongERP)}</span>
+              <span className="mx-1">|</span>
+              <span className="text-red-500">Nóng: {formatCurrency(result.thuongNong)}</span>
+            </p>
+          </div>
         </div>
       </div>
       
-      {/* Body: Bonus and Promotion */}
-      <div className="mt-2 pt-2 border-t border-slate-100 grid grid-cols-2 gap-x-2 text-xs">
-        {/* Column 1: Bonus Details */}
-        <div>
-          <p className="text-slate-500 mb-0.5">Thưởng: <span className="font-bold text-violet-600">{formatCurrency(result.tongThuong)}</span></p>
-          <p className="text-[10px] text-slate-400 truncate">
-            <span className="text-green-600">ERP: {formatCurrency(result.thuongERP)}</span>
-            <span className="mx-1">|</span>
-            <span className="text-red-500">Nóng: {formatCurrency(result.thuongNong)}</span>
+      {/* Promotion */}
+      {result.khuyenMai && (
+        <div className="mt-2 pt-2 border-t border-slate-100">
+          <p className="text-xs font-medium text-slate-700 line-clamp-2" title={result.khuyenMai}>
+            <span className="text-slate-500 font-normal mr-1">KM:</span>{result.khuyenMai}
           </p>
         </div>
-
-        {/* Column 2: Promotion Details */}
-        <div>
-          <p className="text-slate-500 mb-0.5">Khuyến mãi:</p>
-          <p className="font-medium text-slate-700 line-clamp-2 text-[10px]" title={result.khuyenMai || '-'}>
-              {result.khuyenMai || '-'}
-          </p>
-        </div>
-      </div>
+      )}
     </div>
     
-    {/* Footer: Print Controls */}
-    <div className="mt-2 pt-2 border-t border-slate-100 flex justify-between items-center">
+    {/* Right/Bottom: Controls */}
+    <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto border-t sm:border-t-0 border-slate-100 pt-3 sm:pt-0 sm:pl-4 sm:border-l">
         <div className="flex items-center gap-2">
              <button
                 onClick={() => onToggleSelect(result.msp)}
                 title={result.selected ? "Bỏ chọn" : "Chọn in"}
                 className="text-slate-400 hover:text-indigo-600 transition-colors p-1"
             >
-                {result.selected ? <CheckboxCheckedIcon className="h-5 w-5 text-indigo-600" /> : <CheckboxIcon className="h-5 w-5" />}
+                {result.selected ? <CheckboxCheckedIcon className="h-6 w-6 text-indigo-600" /> : <CheckboxIcon className="h-6 w-6" />}
             </button>
             <div className="flex items-center bg-slate-50 rounded-md p-0.5 border border-slate-200">
                 <button
                     onClick={() => onQuantityChange(result.msp, -1)}
                     disabled={result.quantity <= 0}
-                    className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                     <MinusCircleIcon className="h-5 w-5" />
                 </button>
@@ -99,11 +99,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ result, isHighlighted, onTogg
                         else if (e.target.value === '') onSetQuantity(result.msp, 1);
                     }}
                     onFocus={(e) => e.target.select()}
-                    className="w-8 text-center font-semibold text-base sm:text-sm text-slate-800 bg-transparent border-none focus:ring-0 p-0 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none -moz-appearance-textfield"
+                    className="w-10 text-center font-semibold text-base sm:text-sm text-slate-800 bg-transparent border-none focus:ring-0 p-0 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none -moz-appearance-textfield"
                 />
                 <button
                     onClick={() => onQuantityChange(result.msp, 1)}
-                    className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors"
                 >
                     <PlusCircleIcon className="h-5 w-5" />
                 </button>
@@ -113,9 +113,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ result, isHighlighted, onTogg
             <button
                 onClick={() => onPrintSingle(result)}
                 title="In sản phẩm này"
-                className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-md transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-md transition-colors"
             >
-                <PrintIcon className="h-3.5 w-3.5" />
+                <PrintIcon className="h-4 w-4" />
                 In
             </button>
         )}
@@ -249,7 +249,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results, hasData, highl
 
   if (results.length > 0) {
     return (
-        <div className="space-y-4">
+        <div className="flex flex-col gap-3">
             {results.map((product) => (
                 <ProductCard 
                     key={product.msp} 

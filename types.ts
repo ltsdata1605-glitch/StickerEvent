@@ -12,6 +12,16 @@ export interface Product {
   quantity: number;
 }
 
+export interface SavedList {
+  id: string;
+  name: string;
+  userId: string;
+  storeId: string;
+  createdAt: string;
+  items: any[];
+  totalItems: number;
+}
+
 export interface InventoryItem {
   maSieuThi: string;
   tenSieuThi: string;

@@ -2,8 +2,8 @@ import React, { useMemo } from 'react';
 import { Product } from '../types';
 import FileUpload from './FileUpload';
 import SearchBar from './SearchBar';
-import { PrintIcon, SettingsIcon, StarIcon, TagIcon, TrashIcon, ExportIcon, ImportIcon, PenSquareIcon, InventoryIcon, FilePlusIcon } from './Icons';
-import { Trash2 } from 'lucide-react';
+import { PrintIcon, SettingsIcon, StarIcon, TagIcon, TrashIcon, ExportIcon, ImportIcon, PenSquareIcon, InventoryIcon, FilePlusIcon, UserIcon } from './Icons';
+import { Trash2, ShieldAlert } from 'lucide-react';
 
 interface ControlPanelProps {
     employeeName: string;
@@ -19,6 +19,8 @@ interface ControlPanelProps {
     uploadTimestamp: Date | null;
     inventoryUploadTimestamp: Date | null;
     hasInventory: boolean;
+    userRole?: 'admin' | 'staff';
+    activeTab?: 'home' | 'tools';
 
     onEmployeeNameChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onSaveEmployeeName: () => void;
@@ -39,28 +41,35 @@ interface ControlPanelProps {
     onOpenPrintSettings: () => void;
     onPrintSelected: () => void;
     onPrintAll: () => void;
+    onOpenUserManagement?: () => void;
+    onOpenSuperAdminTools?: () => void;
+    onSaveList: () => void;
+    onViewSavedLists: () => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = (props) => {
     const selectedCount = useMemo(() => props.displayedProducts.filter(p => p.selected).length, [props.displayedProducts]);
     const isEmployeeNameEmpty = !props.employeeName || props.employeeName.trim() === '';
+    const isAdmin = props.userRole === 'admin';
     
     return (
-        <aside className="w-full lg:w-96 lg:flex-shrink-0 bg-white p-6 rounded-2xl shadow-lg border border-slate-200 self-start space-y-6">
-            <div className="flex flex-col gap-4">
+        <aside className={`w-full lg:w-96 lg:flex-shrink-0 bg-white p-6 rounded-xl shadow-sm border border-slate-200 self-start space-y-6 ${props.isMobile && props.activeTab === 'home' ? 'bg-transparent border-none shadow-none p-0' : ''}`}>
+            <div className={`flex flex-col gap-4 ${props.isMobile && props.activeTab === 'home' ? 'hidden' : ''}`}>
                 <div className="w-full">
                     <div className="flex items-center justify-between mb-1">
                         <label htmlFor="employee-name-input" className="block text-sm font-medium text-slate-700">
                             Thông tin người in <span className="text-red-500">*</span>
                         </label>
-                        <button 
-                            onClick={props.onReset}
-                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-full transition-colors flex items-center gap-1"
-                            title="Xóa tất cả dữ liệu và làm lại"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                            <span className="text-xs font-medium">Xóa dữ liệu</span>
-                        </button>
+                        {isAdmin && (
+                            <button 
+                                onClick={props.onReset}
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-full transition-colors flex items-center gap-1"
+                                title="Xóa tất cả dữ liệu và làm lại"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                <span className="text-xs font-medium">Xóa dữ liệu</span>
+                            </button>
+                        )}
                     </div>
                     {props.isEditingEmployeeName || !props.employeeName ? (
                         <div className="relative">
@@ -92,84 +101,109 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                     )}
                 </div>
 
-                <div className="pt-2 border-t border-slate-200">
-                    <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-sm font-semibold text-slate-800">Nhập dữ liệu</h3>
-                        <a 
-                            href="https://report.mwgroup.vn/home/dashboard/17" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-xs font-semibold text-indigo-600 underline hover:text-indigo-800 hover:bg-indigo-50 px-2 py-1 rounded transition-colors"
-                        >
-                            Lấy File Tồn Kho
-                        </a>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="relative">
-                            <input
-                                type="file"
-                                id="price-file-input"
-                                onChange={props.onFileChange}
-                                accept=".xlsx, .xls"
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                disabled={props.isLoading}
-                                multiple
-                            />
-                            <label
-                                htmlFor="price-file-input"
-                                className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 border-dashed transition-all text-center h-full ${props.isLoading ? 'bg-slate-50 border-slate-200 cursor-not-allowed' : 'bg-emerald-50 border-emerald-200 hover:border-emerald-400 text-emerald-700'}`}
+                {isAdmin && (
+                    <div className="pt-2 border-t border-slate-200">
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-sm font-semibold text-slate-800">Nhập dữ liệu (Admin)</h3>
+                            <a 
+                                href="https://report.mwgroup.vn/home/dashboard/17" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-xs font-semibold text-indigo-600 underline hover:text-indigo-800 hover:bg-indigo-50 px-2 py-1 rounded transition-colors"
                             >
-                                <FilePlusIcon className="h-6 w-6 mb-1" />
-                                <span className="text-xs font-semibold">Tải File Bảng Giá</span>
-                                {props.uploadTimestamp && (
-                                    <span className="text-[10px] mt-1 opacity-80">
-                                        {props.uploadTimestamp.toLocaleTimeString('vi-VN')}
-                                    </span>
-                                )}
-                            </label>
+                                Lấy File Tồn Kho
+                            </a>
                         </div>
-                        <div className="relative">
-                            <input
-                                type="file"
-                                id="inventory-file-input"
-                                onChange={props.onInventoryFileChange}
-                                accept=".xlsx, .xls"
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                disabled={props.isLoading}
-                            />
-                            <label
-                                htmlFor="inventory-file-input"
-                                className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 border-dashed transition-all text-center h-full ${props.isLoading ? 'bg-slate-50 border-slate-200 cursor-not-allowed' : 'bg-indigo-50 border-indigo-200 hover:border-indigo-400 text-indigo-700'}`}
-                            >
-                                <InventoryIcon className="h-6 w-6 mb-1" />
-                                <span className="text-xs font-semibold">Tải File Tồn Kho</span>
-                                {props.inventoryUploadTimestamp && (
-                                    <span className="text-[10px] mt-1 opacity-80">
-                                        {props.inventoryUploadTimestamp.toLocaleTimeString('vi-VN')}
-                                    </span>
-                                )}
-                            </label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="relative">
+                                <input
+                                    type="file"
+                                    id="inventory-file-input"
+                                    onChange={props.onInventoryFileChange}
+                                    accept=".xlsx, .xls"
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    disabled={props.isLoading}
+                                />
+                                <label
+                                    htmlFor="inventory-file-input"
+                                    className={`flex flex-col items-center justify-center p-3 rounded-xl border border-dashed transition-all text-center h-full ${props.isLoading ? 'bg-slate-50 border-slate-200 cursor-not-allowed' : 'bg-indigo-50 border-indigo-200 hover:border-indigo-400 text-indigo-700'}`}
+                                >
+                                    <InventoryIcon className="h-6 w-6 mb-1" />
+                                    <span className="text-xs font-semibold">Tải File Tồn Kho</span>
+                                    {props.inventoryUploadTimestamp && (
+                                        <span className="text-[10px] mt-1 opacity-80">
+                                            {props.inventoryUploadTimestamp.toLocaleTimeString('vi-VN')}
+                                        </span>
+                                    )}
+                                </label>
+                            </div>
+                            <div className="relative">
+                                <input
+                                    type="file"
+                                    id="price-file-input"
+                                    onChange={props.onFileChange}
+                                    accept=".xlsx, .xls"
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    disabled={props.isLoading}
+                                    multiple
+                                />
+                                <label
+                                    htmlFor="price-file-input"
+                                    className={`flex flex-col items-center justify-center p-3 rounded-xl border border-dashed transition-all text-center h-full ${props.isLoading ? 'bg-slate-50 border-slate-200 cursor-not-allowed' : 'bg-emerald-50 border-emerald-200 hover:border-emerald-400 text-emerald-700'}`}
+                                >
+                                    <FilePlusIcon className="h-6 w-6 mb-1" />
+                                    <span className="text-xs font-semibold">Tải File Bảng Giá</span>
+                                    {props.uploadTimestamp && (
+                                        <span className="text-[10px] mt-1 opacity-80">
+                                            {props.uploadTimestamp.toLocaleTimeString('vi-VN')}
+                                        </span>
+                                    )}
+                                </label>
+                            </div>
                         </div>
+                        {props.hasInventory && (
+                            <div className="mt-2 text-center">
+                                <button 
+                                    onClick={props.onDownloadSampleInventory}
+                                    className="text-xs text-indigo-600 hover:text-indigo-800 hover:underline font-medium"
+                                >
+                                    Tải file mẫu
+                                </button>
+                            </div>
+                        )}
+                        {props.fileName && (
+                            <p className="text-xs text-slate-500 truncate mt-2 text-center" title={props.fileName}>
+                                Đã tải: {props.fileName}
+                            </p>
+                        )}
                     </div>
-                    {props.hasInventory && (
-                        <div className="mt-2 text-center">
+                )}
+
+                {(isAdmin || props.onOpenSuperAdminTools) && (
+                    <div className="pt-2 border-t border-slate-200 space-y-2">
+                        {isAdmin && props.onOpenUserManagement && (
                             <button 
-                                onClick={props.onDownloadSampleInventory}
-                                className="text-xs text-indigo-600 hover:text-indigo-800 hover:underline font-medium"
+                                onClick={props.onOpenUserManagement}
+                                className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors text-sm font-semibold"
                             >
-                                Tải file mẫu
+                                <UserIcon className="h-4 w-4" />
+                                Quản lý người dùng
                             </button>
-                        </div>
-                    )}
-                    {props.fileName && (
-                        <p className="text-xs text-slate-500 truncate mt-2 text-center" title={props.fileName}>
-                            Đã tải: {props.fileName}
-                        </p>
-                    )}
-                </div>
+                        )}
+                        {props.onOpenSuperAdminTools && (
+                            <button 
+                                onClick={props.onOpenSuperAdminTools}
+                                className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-colors text-sm font-bold border border-red-100"
+                            >
+                                <ShieldAlert className="h-4 w-4" />
+                                Super Admin Tools
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
 
-            <div className={`${isEmployeeNameEmpty ? "opacity-60 pointer-events-none grayscale" : ""} ${props.isMobile ? "fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-50" : ""}`}>
+            <div className={`${isEmployeeNameEmpty ? "opacity-60 pointer-events-none grayscale" : ""} ${props.isMobile ? "fixed bottom-16 left-0 right-0 p-4 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40" : ""}`}>
                 <SearchBar
                     searchQuery={props.searchQuery}
                     onSearchChange={props.onSearchChange}
@@ -183,7 +217,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
             </div>
 
              {props.allProducts.length > 0 && !props.isLoading && (
-                 <>
+                 <div className={`${props.isMobile && props.activeTab === 'home' ? 'hidden' : ''}`}>
                     <div className="pt-4 border-t border-slate-200">
                          <h3 className="text-base font-semibold text-slate-800 mb-3">Công cụ nhanh</h3>
                          <div className="grid grid-cols-2 gap-3">
@@ -202,6 +236,14 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                     <div className="pt-4 border-t border-slate-200">
                         <h3 className="text-base font-semibold text-slate-800 mb-3">Thao tác</h3>
                         <div className="flex items-center gap-2 mb-3">
+                            <button onClick={props.onSaveList} disabled={props.displayedProducts.length === 0} title="Lưu danh sách hiện tại" className="flex-1 inline-flex items-center gap-2 justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-slate-100 hover:text-slate-900 h-9 px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Lưu DS
+                            </button>
+                            <button onClick={props.onViewSavedLists} title="Xem danh sách đã lưu" className="flex-1 inline-flex items-center gap-2 justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-slate-100 hover:text-slate-900 h-9 px-3 py-2">
+                                DS đã lưu
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-2 mb-3">
                             <button onClick={props.onTriggerImport} title="Nhập danh sách sản phẩm từ file .json" className="flex-1 inline-flex items-center gap-2 justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-slate-100 hover:text-slate-900 h-9 px-3 py-2">
                                 <ImportIcon className="h-4 w-4 text-slate-600" />
                                 Nhập
@@ -210,7 +252,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                                 <ExportIcon className="h-4 w-4 text-slate-600" />
                                 Xuất
                             </button>
-                            <button onClick={props.onReset} disabled={props.displayedProducts.length === 0} title="Xóa danh sách" className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-slate-100 hover:text-slate-900 h-9 w-9 p-0 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <button onClick={props.onReset} disabled={props.displayedProducts.length === 0} title="Xóa danh sách đang hiển thị" className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-slate-100 hover:text-slate-900 h-9 w-9 p-0 disabled:opacity-50 disabled:cursor-not-allowed">
                                 <TrashIcon className="h-4 w-4 text-slate-600" />
                             </button>
                              <button onClick={props.onOpenPrintSettings} title="Tùy chỉnh thông tin hiển thị trên sticker" className="inline-flex items-center gap-2 justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-slate-100 hover:text-slate-900 h-9 w-9 p-0">
@@ -226,7 +268,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                             </button>
                         </div>
                     </div>
-                </>
+                </div>
              )}
         </aside>
     );

@@ -26,7 +26,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-1">
+      <div className={`flex justify-between items-center mb-1 ${isMobile ? 'hidden' : ''}`}>
         <h2 className="text-lg font-semibold text-slate-800">Tìm kiếm sản phẩm</h2>
       </div>
 
@@ -39,7 +39,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
             onChange={onSearchChange}
             disabled={disabled}
             autoComplete="off"
-            className="w-full pl-12 pr-4 py-3 text-base border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+            className={`w-full ${isMobile ? 'pl-10 pr-3 py-2 text-sm' : 'pl-12 pr-4 py-3 text-base'} border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed`}
           />
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
              <button
@@ -49,7 +49,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
               title="Quét mã vạch/mã QR"
               className="p-1 rounded-full hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <QRIcon className="h-5 w-5 text-slate-400" />
+              <QRIcon className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'} text-slate-400`} />
             </button>
           </div>
           {(suggestions.length > 0 || showNoResults) && (

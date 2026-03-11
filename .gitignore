@@ -7,6 +7,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Firebase & Environment
+firebase-applet-config.json
+.env
+.env.local
+.env.*.local
+
 node_modules
 dist
 dist-ssr

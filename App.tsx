@@ -15,6 +15,7 @@ import ManualInputModal from './components/ManualInputModal';
 import ControlPanel from './components/ControlPanel';
 import PdfPreviewModal from './components/PdfPreviewModal';
 import InventoryToolbar from './components/InventoryToolbar';
+import FilterModal from './components/FilterModal';
 import BottomNavigation from './components/BottomNavigation';
 import Login from './components/Login';
 import UserManagementModal from './components/UserManagementModal';
@@ -200,6 +201,7 @@ export default function App(): React.JSX.Element {
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
   const [isSuperAdminModalOpen, setIsSuperAdminModalOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -1069,35 +1071,41 @@ export default function App(): React.JSX.Element {
 
   return (
     <ErrorBoundary>
-      <div className={`min-h-screen bg-white text-slate-800 flex flex-col items-center p-4 sm:p-6 lg:p-8 ${isMobile ? 'pb-24' : ''}`}>
+      <div className={`min-h-screen bg-white text-slate-800 flex flex-col items-center ${isMobile ? 'p-0' : 'p-4 sm:p-6 lg:p-8'} ${isMobile ? 'pb-24' : ''}`}>
         <div className="w-full max-w-7xl mx-auto">
-          <header className="mb-8">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="bg-indigo-50 p-2 rounded-lg">
-                  <LogoIcon className="h-8 w-8 text-indigo-600" />
-                </div>
-                <div>
-                  <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 tracking-tight leading-tight">
-                    CÔNG CỤ IN STICKER SẢN PHẨM EVENT
-                  </h1>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${userData?.role === 'admin' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
-                        {userData?.role === 'admin' ? 'Quản trị viên' : 'Nhân viên'}
-                    </span>
-                    {userData?.storeId && (
-                        <span className="text-[10px] font-medium text-slate-500">Cửa hàng: {userData.storeId}</span>
-                    )}
+          <header className={`${isMobile ? 'sticky top-0 z-50 bg-white border-b border-slate-100 p-2 mb-2' : 'mb-8'}`}>
+            <div className={`flex items-center justify-between gap-2 ${isMobile ? '' : 'flex-col sm:flex-row bg-white p-4 rounded-xl shadow-sm border border-slate-100 mb-6'}`}>
+              <div className="flex items-center gap-2 min-w-0">
+                {!isMobile && (
+                  <div className="bg-indigo-50 p-2 rounded-lg">
+                    <LogoIcon className="h-8 w-8 text-indigo-600" />
                   </div>
+                )}
+                <div className="min-w-0">
+                  <h1 className={`${isMobile ? 'text-sm' : 'text-lg sm:text-xl md:text-2xl'} font-bold text-slate-900 tracking-tight leading-tight truncate uppercase`}>
+                    {isMobile ? 'IN STICKER EVENT' : 'CÔNG CỤ IN STICKER SẢN PHẨM EVENT'}
+                  </h1>
+                  {!isMobile && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${userData?.role === 'admin' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                          {userData?.role === 'admin' ? 'Quản trị viên' : 'Nhân viên'}
+                      </span>
+                      {userData?.storeId && (
+                          <span className="text-[10px] font-medium text-slate-500">Cửa hàng: {userData.storeId}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setIsChangePasswordOpen(true)}
-                  className="px-3 py-1.5 text-sm font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 hover:text-indigo-600 rounded-lg transition-colors border border-slate-200"
-                >
-                  Đổi mật khẩu
-                </button>
+              <div className="flex items-center gap-2 shrink-0">
+                {!isMobile && (
+                  <button
+                    onClick={() => setIsChangePasswordOpen(true)}
+                    className="px-3 py-1.5 text-sm font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 hover:text-indigo-600 rounded-lg transition-colors border border-slate-200"
+                  >
+                    Đổi mật khẩu
+                  </button>
+                )}
                 <button
                   onClick={async () => {
                     await auth.signOut();
@@ -1114,7 +1122,7 @@ export default function App(): React.JSX.Element {
                     setSuggestions([]);
                     await clearData();
                   }}
-                  className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-100"
+                  className={`${isMobile ? 'px-2 py-1 text-[10px]' : 'px-3 py-1.5 text-sm'} font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-100 uppercase`}
                 >
                   Đăng xuất
                 </button>
@@ -1122,7 +1130,7 @@ export default function App(): React.JSX.Element {
             </div>
           </header>
 
-          <main className="flex flex-col lg:flex-row gap-8">
+          <main className={`flex flex-col lg:flex-row ${isMobile ? 'gap-2' : 'gap-8'}`}>
             <ControlPanel 
               employeeName={employeeName}
               isEditingEmployeeName={isEditingEmployeeName}
@@ -1163,7 +1171,7 @@ export default function App(): React.JSX.Element {
               onViewSavedLists={handleViewSavedLists}
               activeTab={activeTab}
             />
-            <div className={`flex-1 space-y-4 ${isMobile && activeTab === 'tools' ? 'hidden' : ''}`}>
+            <div className={`flex-1 ${isMobile ? 'px-2 space-y-2' : 'space-y-4'} ${isMobile && activeTab === 'tools' ? 'hidden' : ''}`}>
                {isLoading && (
                   <div className="text-center p-4">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
@@ -1193,14 +1201,16 @@ export default function App(): React.JSX.Element {
 
               <input type="file" ref={importInputRef} onChange={handleImport} accept=".json" className="hidden" multiple />
 
-              <InventoryToolbar 
-                inventory={inventory}
-                filters={inventoryFilters}
-                useInventoryQuantity={useInventoryQuantity}
-                onFilterChange={handleInventoryFilterChange}
-                onClearFilters={handleClearInventoryFilters}
-                onUseInventoryQuantityChange={handleUseInventoryQuantityChange}
-              />
+              {!isMobile && (
+                <InventoryToolbar 
+                  inventory={inventory}
+                  filters={inventoryFilters}
+                  useInventoryQuantity={useInventoryQuantity}
+                  onFilterChange={handleInventoryFilterChange}
+                  onClearFilters={handleClearInventoryFilters}
+                  onUseInventoryQuantityChange={handleUseInventoryQuantityChange}
+                />
+              )}
 
               <ResultsDisplay 
                 results={displayedProducts} 
@@ -1221,8 +1231,21 @@ export default function App(): React.JSX.Element {
             activeTab={activeTab}
             onTabChange={setActiveTab}
             onScanClick={() => setIsScannerOpen(true)}
-            onPrintClick={handlePrintSelected}
-            onSettingsClick={() => setIsPrintSettingsOpen(true)}
+            onSaveListClick={handleSaveList}
+            onFilterClick={() => setIsFilterModalOpen(true)}
+          />
+        )}
+
+        {isFilterModalOpen && (
+          <FilterModal
+            isOpen={isFilterModalOpen}
+            onClose={() => setIsFilterModalOpen(false)}
+            inventory={inventory}
+            filters={inventoryFilters}
+            useInventoryQuantity={useInventoryQuantity}
+            onFilterChange={handleInventoryFilterChange}
+            onClearFilters={handleClearInventoryFilters}
+            onUseInventoryQuantityChange={handleUseInventoryQuantityChange}
           />
         )}
 

@@ -110,8 +110,6 @@ service cloud.firestore {
       return isAuthenticated() &&
         (
           (request.auth.token.email == "lts.truongson@gmail.com" && request.auth.token.email_verified == true) ||
-          (request.auth.token.email == "lts.truongson@example.com") ||
-          (request.auth.token.email == "21707@example.com") ||
           (request.auth.token.email == "admin@example.com")
         );
     }

@@ -63,19 +63,19 @@ const Scanner: React.FC<ScannerProps> = ({ onScanSuccess, onClose }) => {
     const success = onScanSuccessRef.current(decodedText);
     
     if (success) {
-      if (navigator.vibrate) navigator.vibrate(300); // Stronger success vibration
+      if (navigator.vibrate) navigator.vibrate(200); // Vibrate once on success
       playSound('success');
-      setScanResult({ type: 'success', message: `Thành công: ${decodedText}` });
+      setScanResult({ type: 'success', message: `Đã tìm thấy: ${decodedText}` });
     } else {
-      if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]); // Distinct error vibration
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]); // Short pattern for error
       playSound('error');
-      setScanResult({ type: 'error', message: `Không tìm thấy: ${decodedText}` });
+      setScanResult({ type: 'error', message: `Không có trong danh sách: ${decodedText}` });
     }
 
     setTimeout(() => {
       isScanningPaused.current = false;
       setScanResult(null);
-    }, 1500); // Increased delay to 1.5s to prevent double scans and give user feedback time.
+    }, 1200); // Slightly reduced delay
   }, [playSound]);
 
   const config = useMemo(() => ({
@@ -191,18 +191,31 @@ const Scanner: React.FC<ScannerProps> = ({ onScanSuccess, onClose }) => {
     <div className="fixed inset-0 z-50 bg-black bg-opacity-80 flex flex-col items-center justify-center p-4 backdrop-blur-sm">
       <div className="relative w-full max-w-md bg-slate-900 rounded-2xl overflow-hidden shadow-2xl">
         <div id={readerId} className="w-full aspect-square"></div>
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-2/3 h-2/3 border-4 border-dashed border-white/50 rounded-lg"></div>
-        </div>
         
-        <div className="absolute bottom-4 left-4 right-4 z-20">
-            {scanResult && (
-                <div className={`flex items-center gap-3 p-3 rounded-lg text-white font-semibold transition-all duration-300 animate-pulse-strong ${scanResult.type === 'success' ? 'bg-green-600/90' : 'bg-red-600/90'}`}>
-                {scanResult.type === 'success' ? <CheckCircleIcon className="h-6 w-6 flex-shrink-0" /> : <XCircleIcon className="h-6 w-6 flex-shrink-0" />}
-                <span className="truncate">{scanResult.message}</span>
-                </div>
-            )}
-        </div>
+        {/* Overlay for scanning frame */}
+        {!scanResult && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-2/3 h-2/3 border-4 border-dashed border-white/50 rounded-lg"></div>
+          </div>
+        )}
+        
+        {/* Result Overlay - Covers the camera view */}
+        {scanResult && (
+          <div className={`absolute inset-0 z-30 flex flex-col items-center justify-center text-white font-bold transition-all duration-300 ${scanResult.type === 'success' ? 'bg-slate-800/95' : 'bg-red-950/95'}`}>
+            <div className={`p-6 rounded-full mb-4 ${scanResult.type === 'success' ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+              {scanResult.type === 'success' ? 
+                <CheckCircleIcon className="h-24 w-24 text-green-400 animate-bounce" /> : 
+                <XCircleIcon className="h-24 w-24 text-red-400 animate-pulse" />
+              }
+            </div>
+            <h3 className="text-2xl mb-2">{scanResult.type === 'success' ? 'THÀNH CÔNG' : 'LỖI'}</h3>
+            <p className="text-lg px-6 text-center font-medium opacity-90">{scanResult.message}</p>
+            <div className="mt-8 flex items-center gap-2 text-sm font-normal text-slate-400">
+              <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+              Đang chuẩn bị quét tiếp...
+            </div>
+          </div>
+        )}
 
       </div>
       <div className="text-center text-white mt-4 max-w-md">

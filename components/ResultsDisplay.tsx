@@ -31,7 +31,7 @@ interface ProductCardProps {
 const ProductCard: React.FC<ProductCardProps> = ({ result, isHighlighted, onToggleSelect, onQuantityChange, onSetQuantity, onPrintSingle, isMobile }) => (
   <div 
     data-msp={result.msp}
-    className={`bg-white p-3 sm:p-4 rounded-xl shadow-sm border hover:shadow-md hover:border-indigo-400 transition-all duration-300 ease-in-out flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center fade-in ${isHighlighted ? 'animate-pulse-strong border-amber-500 border-2' : 'border-slate-200'}`}
+    className={`bg-white ${isMobile ? 'p-2' : 'p-3 sm:p-4'} rounded-xl shadow-sm border hover:shadow-md hover:border-indigo-400 transition-all duration-300 ease-in-out flex flex-col sm:flex-row ${isMobile ? 'gap-1' : 'gap-3 sm:gap-4'} items-start sm:items-center fade-in ${isHighlighted ? 'animate-pulse-strong border-amber-500 border-2' : 'border-slate-200'}`}
   >
     {/* Left/Top: Info */}
     <div className="flex-1 min-w-0 w-full">
@@ -46,7 +46,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ result, isHighlighted, onTogg
           </div>
         </div>
         
-        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:gap-0 mt-2 sm:mt-0 w-full sm:w-auto border-t sm:border-t-0 border-slate-100 pt-2 sm:pt-0">
+        <div className={`flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:gap-0 ${isMobile ? 'mt-1' : 'mt-2 sm:mt-0'} w-full sm:w-auto border-t sm:border-t-0 border-slate-100 ${isMobile ? 'pt-1' : 'pt-2 sm:pt-0'}`}>
           <div className="text-left sm:text-right">
             <p className="text-base sm:text-lg font-bold text-red-600 leading-none">{result.giaGiam}</p>
             <p className="text-[10px] sm:text-xs text-slate-400 line-through mt-0.5">{result.giaGoc}</p>
@@ -64,8 +64,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ result, isHighlighted, onTogg
       
       {/* Promotion */}
       {result.khuyenMai && (
-        <div className="mt-2 pt-2 border-t border-slate-100">
-          <p className="text-xs font-medium text-slate-700 line-clamp-2" title={result.khuyenMai}>
+        <div className={`${isMobile ? 'mt-1 pt-1' : 'mt-2 pt-2'} border-t border-slate-100`}>
+          <p className="text-[10px] sm:text-xs font-medium text-slate-700 line-clamp-2" title={result.khuyenMai}>
             <span className="text-slate-500 font-normal mr-1">KM:</span>{result.khuyenMai}
           </p>
         </div>
@@ -73,7 +73,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ result, isHighlighted, onTogg
     </div>
     
     {/* Right/Bottom: Controls */}
-    <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto border-t sm:border-t-0 border-slate-100 pt-3 sm:pt-0 sm:pl-4 sm:border-l">
+    <div className={`flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto border-t sm:border-t-0 border-slate-100 ${isMobile ? 'pt-1' : 'pt-3 sm:pt-0'} sm:pl-4 sm:border-l`}>
         <div className="flex items-center gap-2">
              <button
                 onClick={() => onToggleSelect(result.msp)}
@@ -249,7 +249,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results, hasData, highl
 
   if (results.length > 0) {
     return (
-        <div className="flex flex-col gap-3">
+        <div className={`flex flex-col ${isMobile ? 'gap-2' : 'gap-3'}`}>
             {results.map((product) => (
                 <ProductCard 
                     key={product.msp} 

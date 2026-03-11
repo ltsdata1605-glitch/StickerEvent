@@ -53,7 +53,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
     const isAdmin = props.userRole === 'admin';
     
     return (
-        <aside className={`w-full lg:w-96 lg:flex-shrink-0 bg-white p-6 rounded-xl shadow-sm border border-slate-200 self-start space-y-6 ${props.isMobile && props.activeTab === 'home' ? 'bg-transparent border-none shadow-none p-0' : ''}`}>
+        <aside className={`w-full lg:w-96 lg:flex-shrink-0 bg-white p-6 rounded-xl shadow-sm border border-slate-200 self-start space-y-6 ${props.isMobile && props.activeTab === 'home' ? 'contents' : 'flex flex-col'}`}>
             <div className={`flex flex-col gap-4 ${props.isMobile && props.activeTab === 'home' ? 'hidden' : ''}`}>
                 <div className="w-full">
                     <div className="flex items-center justify-between mb-1">
@@ -203,7 +203,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                 )}
             </div>
 
-            <div className={`${isEmployeeNameEmpty ? "opacity-60 pointer-events-none grayscale" : ""} ${props.isMobile ? "fixed bottom-16 left-0 right-0 p-4 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40" : ""}`}>
+            <div className={`${isEmployeeNameEmpty ? "opacity-60 pointer-events-none grayscale" : ""} ${props.isMobile ? "fixed bottom-14 left-0 right-0 p-2 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40" : ""}`}>
                 <SearchBar
                     searchQuery={props.searchQuery}
                     onSearchChange={props.onSearchChange}

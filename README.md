@@ -1,20 +1,53 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Sticker Event App 🚀
 
-# Run and deploy your AI Studio app
+Ứng dụng quản lý và tra cứu thông tin sản phẩm từ file Excel, tích hợp tính năng tính toán thưởng (bonus) và báo cáo dữ liệu.
 
-This contains everything you need to run your app locally.
+## ✨ Tính năng chính
+- **Nhập liệu Excel**: Tải lên file Excel chứa danh sách sản phẩm.
+- **Tra cứu nhanh**: Tìm kiếm sản phẩm theo mã code.
+- **Tính toán Bonus**: Tự động tính toán các khoản thưởng dựa trên dữ liệu.
+- **Báo cáo & Phân tích**: Biểu đồ trực quan về doanh số và hiệu quả.
+- **Đồng bộ Firebase**: Lưu trữ dữ liệu an toàn và thời gian thực.
 
-View your app in AI Studio: https://ai.studio/apps/16672ec9-22fb-43a6-b6ee-e59aa8a8c699
+## 🛠 Công nghệ sử dụng
+- **Frontend**: React, TypeScript, Vite, Tailwind CSS.
+- **Backend**: Firebase (Firestore, Authentication).
+- **Thư viện**: Lucide Icons, Recharts, XLSX.
 
-## Run Locally
+## 🚀 Hướng dẫn cài đặt (Local Development)
 
-**Prerequisites:**  Node.js
+1. **Clone repository**:
+   ```bash
+   git clone <your-github-repo-url>
+   cd <repo-name>
+   ```
 
+2. **Cài đặt dependencies**:
+   ```bash
+   npm install
+   ```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+3. **Cấu hình môi trường**:
+   - Tạo file `.env.local` dựa trên `.env.example`.
+   - Điền các thông tin cấu hình Firebase của bạn.
+
+4. **Chạy ứng dụng**:
+   ```bash
+   npm run dev
+   ```
+
+## 📦 Triển khai (Deployment)
+
+### Netlify
+Ứng dụng đã được cấu hình sẵn cho Netlify thông qua file `netlify.toml`.
+1. Kết nối repo này với Netlify.
+2. Thêm các biến môi trường (Environment Variables) trong cài đặt Netlify tương ứng với các biến trong `.env.example`.
+
+### GitHub Pages
+Nếu muốn triển khai lên GitHub Pages, hãy cập nhật `base` trong `vite.config.ts` nếu repo không nằm ở root domain.
+
+## 🔒 Bảo mật
+File `firebase-applet-config.json` đã được đưa vào `.gitignore` để bảo vệ mã API của bạn. Hãy luôn sử dụng **Environment Variables** cho các môi trường production.
+
+---
+*Phát triển bởi [AI Studio Build](https://ai.studio/build)*

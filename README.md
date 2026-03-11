@@ -39,9 +39,20 @@
 ## 📦 Triển khai (Deployment)
 
 ### Netlify
-Ứng dụng đã được cấu hình sẵn cho Netlify thông qua file `netlify.toml`.
+Ứng dụng đã được cấu hình sẵn cho Netlify thông qua file `netlify.toml` và `public/_redirects`.
 1. Kết nối repo này với Netlify.
-2. Thêm các biến môi trường (Environment Variables) trong cài đặt Netlify tương ứng với các biến trong `.env.example`.
+2. **Cấu hình Biến môi trường (Environment Variables)**: Trong cài đặt Netlify (Site settings > Build & deploy > Environment), hãy thêm các biến sau:
+   - `VITE_FIREBASE_API_KEY`
+   - `VITE_FIREBASE_AUTH_DOMAIN`
+   - `VITE_FIREBASE_PROJECT_ID`
+   - `VITE_FIREBASE_STORAGE_BUCKET`
+   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+   - `VITE_FIREBASE_APP_ID`
+   - `VITE_FIREBASE_MEASUREMENT_ID`
+3. **Cấu hình Firebase Authorized Domains**:
+   - Truy cập [Firebase Console](https://console.firebase.google.com/).
+   - Chọn dự án của bạn > **Authentication** > **Settings** > **Authorized domains**.
+   - Thêm domain Netlify của bạn (ví dụ: `your-app.netlify.app`) vào danh sách. Nếu không, tính năng đăng nhập sẽ bị chặn.
 
 ### GitHub Pages
 Nếu muốn triển khai lên GitHub Pages, hãy cập nhật `base` trong `vite.config.ts` nếu repo không nằm ở root domain.

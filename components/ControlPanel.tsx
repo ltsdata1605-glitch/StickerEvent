@@ -36,6 +36,7 @@ interface ControlPanelProps {
     onShowTopDiscount: () => void;
     onOpenManualInput: () => void;
     onReset: () => void;
+    onClearAll: () => void;
     onTriggerImport: () => void;
     onExport: () => void;
     onOpenPrintSettings: () => void;
@@ -45,6 +46,8 @@ interface ControlPanelProps {
     onOpenSuperAdminTools?: () => void;
     onSaveList: () => void;
     onViewSavedLists: () => void;
+    showManagerInstructions?: boolean;
+    onCloseInstructions?: () => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = (props) => {
@@ -62,9 +65,9 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                         </label>
                         {isAdmin && (
                             <button 
-                                onClick={props.onReset}
+                                onClick={props.onClearAll}
                                 className="p-1.5 text-red-500 hover:bg-red-50 rounded-full transition-colors flex items-center gap-1"
-                                title="Xóa tất cả dữ liệu và làm lại"
+                                title="Xóa toàn bộ dữ liệu tồn kho và giá trên hệ thống"
                             >
                                 <Trash2 className="h-4 w-4" />
                                 <span className="text-xs font-medium">Xóa dữ liệu</span>
@@ -161,21 +164,32 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                                 </label>
                             </div>
                         </div>
-                        {props.hasInventory && (
-                            <div className="mt-2 text-center">
-                                <button 
-                                    onClick={props.onDownloadSampleInventory}
-                                    className="text-xs text-indigo-600 hover:text-indigo-800 hover:underline font-medium"
-                                >
-                                    Tải file mẫu
-                                </button>
-                            </div>
-                        )}
                         {props.fileName && (
                             <p className="text-xs text-slate-500 truncate mt-2 text-center" title={props.fileName}>
                                 Đã tải: {props.fileName}
                             </p>
                         )}
+                    </div>
+                )}
+
+                {isAdmin && props.showManagerInstructions && (
+                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 relative animate-in fade-in slide-in-from-top-2 duration-500">
+                        <button 
+                            onClick={props.onCloseInstructions}
+                            className="absolute top-2 right-2 text-indigo-400 hover:text-indigo-600"
+                        >
+                            <TrashIcon className="h-4 w-4" />
+                        </button>
+                        <h3 className="text-sm font-bold text-indigo-900 mb-2 flex items-center gap-2">
+                            <ShieldAlert className="h-4 w-4" />
+                            Hướng dẫn cho Quản lý
+                        </h3>
+                        <div className="space-y-3 text-[11px] leading-relaxed text-indigo-800">
+                            <p><strong>Bước 1:</strong> Lấy file tồn kho &gt; Chọn nhóm ĐGD, DCNB, Phụ Kiện &gt; Chọn siêu thị &gt; Chọn trạng thái mới &gt; Xem báo cáo</p>
+                            <p><strong>Bước 2:</strong> Upload file vừa đỗ tồn vào <strong>"Tải File tồn kho"</strong></p>
+                            <p><strong>Bước 3:</strong> Chờ dữ liệu xử lý =&gt; File mẫu in giá sẽ tự động được tải xuống</p>
+                            <p><strong>Bước 4:</strong> Vào ERP &gt; Chọn Ngành hàng &gt; Chọn All nhóm hàng &gt; Bên phần in giá chọn "Thêm sản phẩm" &gt; Nhập Excel &gt; Chọn mẫu in 81 &gt; In bảng giá &gt; Xuất file định dạng "Data-only(*.xlsx)" (Làm lần lượt từng ngành hàng, mỗi ngành hàng sẽ có 1 file giá) &gt; Vào <strong>"Tải File bảng giá"</strong> chọn 1 lần nhiều file giá &gt; Bấm ok.</p>
+                        </div>
                     </div>
                 )}
 

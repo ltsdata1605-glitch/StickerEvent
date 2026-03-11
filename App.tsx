@@ -122,6 +122,8 @@ export default function App(): React.JSX.Element {
   const debounceTimeout = useRef<number | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [isClearAllConfirmOpen, setIsClearAllConfirmOpen] = useState(false);
+  const [showManagerInstructions, setShowManagerInstructions] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'home' | 'tools'>('home');
@@ -284,6 +286,10 @@ export default function App(): React.JSX.Element {
       // Load data from Firestore if user is logged in
       if (user && userData && userData.storeId) {
         loadFirestoreData(userData.storeId);
+        // Show instructions for managers if they have no data
+        if (userData.role === 'admin' && allProducts.length === 0 && inventory.length === 0) {
+          setShowManagerInstructions(true);
+        }
       } else {
         setIsInitializing(false);
       }
@@ -323,10 +329,30 @@ export default function App(): React.JSX.Element {
       
       if (firestoreProducts.length > 0) {
         setAllProducts(firestoreProducts);
+        // Find latest update time from products
+        const productsRef = collection(db, 'stores', storeId, 'products');
+        const qLatest = query(productsRef, where('updatedAt', '!=', null));
+        const latestSnap = await getDocs(qLatest);
+        let latest = 0;
+        latestSnap.forEach(doc => {
+            const ts = doc.data().updatedAt?.toMillis() || 0;
+            if (ts > latest) latest = ts;
+        });
+        if (latest > 0) setUploadTimestamp(new Date(latest));
       }
 
       if (firestoreInventory.length > 0) {
         setInventory(firestoreInventory);
+        // Find latest update time from inventory
+        const invRef = collection(db, 'stores', storeId, 'inventory');
+        const qLatestInv = query(invRef, where('updatedAt', '!=', null));
+        const latestSnapInv = await getDocs(qLatestInv);
+        let latestInv = 0;
+        latestSnapInv.forEach(doc => {
+            const ts = doc.data().updatedAt?.toMillis() || 0;
+            if (ts > latestInv) latestInv = ts;
+        });
+        if (latestInv > 0) setInventoryUploadTimestamp(new Date(latestInv));
       }
 
     } catch (err: any) {
@@ -392,6 +418,11 @@ export default function App(): React.JSX.Element {
         const fileNames: string[] = [];
         const productMap = new Map<string, Product>();
         let partialError = null;
+
+        // Auto-clear old data for admin
+        if (userData && userData.storeId) {
+            await clearStoreDataOnFirestore(userData.storeId, 'products');
+        }
 
         // Iterate directly over the FileList. `for...of` is supported and preserves the `File` type.
         for (const file of files) {
@@ -461,54 +492,17 @@ export default function App(): React.JSX.Element {
     }
   }, [userData]);
   
-  const handleInventoryFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (userData?.role !== 'admin') {
-        showAlert("Chỉ quản trị viên mới có quyền tải file tồn kho.");
-        return;
-    }
-
-    const file = event.target.files?.[0];
-    if (file) {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const items = await parseInventoryFile(file);
-        const newTimestamp = new Date();
-        setInventory(items);
-        setInventoryUploadTimestamp(newTimestamp);
-        
-        // Save to Local IndexedDB
-        await saveInventoryData(items, newTimestamp);
-
-        // Upload to Firestore
-        if (userData && userData.storeId) {
-            await uploadInventoryToFirestore(userData.storeId, items);
-        }
-
-        setError(null);
-      } catch (err) {
-        setError('Lỗi khi xử lý file tồn kho. Vui lòng kiểm tra định dạng file.');
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-        if (event.target) event.target.value = '';
-      }
-    }
-  }, [userData]);
-
-  const handleDownloadSampleInventory = useCallback(() => {
-    if (inventory.length === 0) return;
+  const handleDownloadSampleInventory = useCallback((itemsToUse?: InventoryItem[]) => {
+    const targetInventory = itemsToUse || inventory;
+    if (targetInventory.length === 0) return;
 
     // Group inventory by nganhHang
-    const groupedByNganhHang = inventory.reduce((acc, item) => {
+    const groupedByNganhHang = targetInventory.reduce((acc, item) => {
       const nganhHang = item.nganhHang || 'Khong_xac_dinh';
       if (!acc[nganhHang]) {
         acc[nganhHang] = [];
       }
       if (item.maSanPham) {
-        // Use a Set or just array, but let's keep it simple. We can deduplicate if needed, 
-        // but the prompt doesn't explicitly ask for deduplication. We'll just push.
-        // Actually, deduplication might be good, but let's just push.
         acc[nganhHang].push(item.maSanPham);
       }
       return acc;
@@ -559,6 +553,52 @@ export default function App(): React.JSX.Element {
 
     downloadFiles();
   }, [inventory]);
+
+  const handleInventoryFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role !== 'admin') {
+        showAlert("Chỉ quản trị viên mới có quyền tải file tồn kho.");
+        return;
+    }
+
+    const file = event.target.files?.[0];
+    if (file) {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // Auto-clear old data for admin
+        if (userData && userData.storeId) {
+            await clearStoreDataOnFirestore(userData.storeId, 'inventory');
+        }
+
+        const items = await parseInventoryFile(file);
+        const newTimestamp = new Date();
+        setInventory(items);
+        setInventoryUploadTimestamp(newTimestamp);
+        
+        // Save to Local IndexedDB
+        await saveInventoryData(items, newTimestamp);
+
+        // Upload to Firestore
+        if (userData && userData.storeId) {
+            await uploadInventoryToFirestore(userData.storeId, items);
+        }
+
+        setError(null);
+        
+        // Auto-download template after processing
+        setTimeout(() => {
+            handleDownloadSampleInventory(items);
+        }, 500);
+
+      } catch (err) {
+        setError('Lỗi khi xử lý file tồn kho. Vui lòng kiểm tra định dạng file.');
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+        if (event.target) event.target.value = '';
+      }
+    }
+  }, [userData, handleDownloadSampleInventory]);
 
   const handleInventoryFilterChange = useCallback((key: string, value: string | string[]) => {
     setInventoryFilters(prev => ({ ...prev, [key]: value }));
@@ -846,8 +886,39 @@ export default function App(): React.JSX.Element {
     setIsResetConfirmOpen(false);
   }, []);
 
+  const executeClearAll = useCallback(async () => {
+    setIsLoading(true);
+    try {
+        if (userData && userData.storeId) {
+            await Promise.all([
+                clearStoreDataOnFirestore(userData.storeId, 'products'),
+                clearStoreDataOnFirestore(userData.storeId, 'inventory')
+            ]);
+        }
+        setAllProducts([]);
+        setInventory([]);
+        setDisplayedProducts([]);
+        setFileName(null);
+        setUploadTimestamp(null);
+        setInventoryUploadTimestamp(null);
+        setFileExportDate(null);
+        await clearData();
+        showAlert("Đã xóa toàn bộ dữ liệu tồn kho và giá.");
+    } catch (err) {
+        console.error(err);
+        setError("Lỗi khi xóa dữ liệu hệ thống.");
+    } finally {
+        setIsLoading(false);
+        setIsClearAllConfirmOpen(false);
+    }
+  }, [userData]);
+
   const handleReset = () => {
     setIsResetConfirmOpen(true);
+  };
+
+  const handleClearAll = () => {
+    setIsClearAllConfirmOpen(true);
   };
 
   const handleExport = () => {
@@ -1085,16 +1156,21 @@ export default function App(): React.JSX.Element {
                   <h1 className={`${isMobile ? 'text-sm' : 'text-lg sm:text-xl md:text-2xl'} font-bold text-slate-900 tracking-tight leading-tight truncate uppercase`}>
                     {isMobile ? 'IN STICKER EVENT' : 'CÔNG CỤ IN STICKER SẢN PHẨM EVENT'}
                   </h1>
-                  {!isMobile && (
-                    <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 mt-1">
+                    {!isMobile && (
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${userData?.role === 'admin' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
                           {userData?.role === 'admin' ? 'Quản trị viên' : 'Nhân viên'}
                       </span>
-                      {userData?.storeId && (
-                          <span className="text-[10px] font-medium text-slate-500">Cửa hàng: {userData.storeId}</span>
-                      )}
-                    </div>
-                  )}
+                    )}
+                    {userData?.storeId && !isMobile && (
+                        <span className="text-[10px] font-medium text-slate-500">Kho: {userData.storeId}</span>
+                    )}
+                    {(uploadTimestamp || inventoryUploadTimestamp) && (
+                        <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                            Cập nhật: {new Date(Math.max(uploadTimestamp?.getTime() || 0, inventoryUploadTimestamp?.getTime() || 0)).toLocaleString('vi-VN')}
+                        </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -1160,6 +1236,7 @@ export default function App(): React.JSX.Element {
               onShowTopDiscount={handleShowTopDiscount}
               onOpenManualInput={() => setIsManualInputOpen(true)}
               onReset={handleReset}
+              onClearAll={handleClearAll}
               onTriggerImport={handleTriggerImport}
               onExport={handleExport}
               onOpenPrintSettings={() => setIsPrintSettingsOpen(true)}
@@ -1170,6 +1247,8 @@ export default function App(): React.JSX.Element {
               onSaveList={handleSaveList}
               onViewSavedLists={handleViewSavedLists}
               activeTab={activeTab}
+              showManagerInstructions={showManagerInstructions}
+              onCloseInstructions={() => setShowManagerInstructions(false)}
             />
             <div className={`flex-1 ${isMobile ? 'px-2 space-y-2' : 'space-y-4'} ${isMobile && activeTab === 'tools' ? 'hidden' : ''}`}>
                {isLoading && (
@@ -1329,6 +1408,29 @@ export default function App(): React.JSX.Element {
                       </button>
                       <button onClick={executeReset} className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-red-600 text-red-50 hover:bg-red-700 h-10 px-4 py-2">
                           Xóa
+                      </button>
+                  </div>
+              </div>
+          </div>
+        )}
+
+        {isClearAllConfirmOpen && (
+          <div className="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setIsClearAllConfirmOpen(false)}>
+              <div 
+                  className="relative bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4" 
+                  onClick={(e) => e.stopPropagation()}
+              >
+                  <div className="text-center">
+                      <ShieldAlert className="mx-auto h-12 w-12 text-red-500"/>
+                      <h2 className="text-xl font-bold text-slate-900 mt-2">Xác nhận Xóa Hệ Thống</h2>
+                      <p className="text-slate-600 mt-1">Hành động này sẽ xóa TOÀN BỘ dữ liệu tồn kho và bảng giá trên hệ thống. Bạn có chắc chắn muốn tiếp tục?</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                      <button onClick={() => setIsClearAllConfirmOpen(false)} className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-slate-100 h-10 px-4 py-2">
+                          Hủy
+                      </button>
+                      <button onClick={executeClearAll} className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-red-600 text-red-50 hover:bg-red-700 h-10 px-4 py-2">
+                          Xác nhận Xóa
                       </button>
                   </div>
               </div>

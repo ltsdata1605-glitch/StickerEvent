@@ -24,6 +24,8 @@ import SavedListsModal from './components/SavedListsModal';
 import SaveListModal from './components/SaveListModal';
 import AlertModal from './components/AlertModal';
 import SuperAdminModal from './components/SuperAdminModal';
+import UserGuideModal from './components/UserGuideModal';
+import { Info, ShieldAlert } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
@@ -202,6 +204,7 @@ export default function App(): React.JSX.Element {
   const [isManualInputOpen, setIsManualInputOpen] = useState(false);
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
   const [isSuperAdminModalOpen, setIsSuperAdminModalOpen] = useState(false);
+  const [isUserGuideOpen, setIsUserGuideOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
@@ -1182,6 +1185,15 @@ export default function App(): React.JSX.Element {
                     Đổi mật khẩu
                   </button>
                 )}
+                {!isMobile && (
+                  <button
+                    onClick={() => setIsUserGuideOpen(true)}
+                    className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-transparent hover:border-indigo-100"
+                    title="Hướng dẫn sử dụng"
+                  >
+                    <Info className="h-5 w-5" />
+                  </button>
+                )}
                 <button
                   onClick={async () => {
                     await auth.signOut();
@@ -1459,6 +1471,12 @@ export default function App(): React.JSX.Element {
           onClose={() => setIsSaveListModalOpen(false)}
           onSave={onConfirmSaveList}
           defaultName={`Danh sách ${new Date().toLocaleDateString('vi-VN')}`}
+        />
+
+        <UserGuideModal 
+          isOpen={isUserGuideOpen} 
+          onClose={() => setIsUserGuideOpen(false)} 
+          userRole={userData?.role}
         />
 
         <AlertModal

@@ -9,6 +9,22 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@700&family=Oswald:wght@700&display=swap" rel="stylesheet">
+    <script>
+      // Prevent libraries from trying to overwrite window.fetch, which is a read-only getter in this environment
+      (function() {
+        var originalFetch = window.fetch;
+        try {
+          Object.defineProperty(window, 'fetch', {
+            configurable: false,
+            enumerable: true,
+            get: function() { return originalFetch; },
+            set: function() { console.warn('Blocked attempt to overwrite window.fetch'); }
+          });
+        } catch (e) {
+          // If it's already non-configurable, this might fail, but that's okay
+        }
+      })();
+    </script>
 <style>
       @keyframes pulse-strong {
         0%, 100% {

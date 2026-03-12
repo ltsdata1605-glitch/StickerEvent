@@ -102,29 +102,43 @@ const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose, userRo
           <section>
             <div className="flex items-center gap-2 mb-4">
               <Database className="h-5 w-5 text-emerald-500" />
-              <h3 className="text-base font-bold text-slate-800">4. Cách cập nhật dữ liệu & Sử dụng</h3>
+              <h3 className="text-base font-bold text-slate-800">4. Quy trình dành cho Quản lý</h3>
             </div>
             <div className="space-y-4">
               <div className="relative pl-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
                 <div className="relative mb-6">
                   <div className="absolute -left-8 top-0 w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold">1</div>
-                  <h4 className="text-sm font-bold text-slate-800 mb-1">Tải dữ liệu (Dành cho Quản lý)</h4>
-                  <p className="text-sm text-slate-600">Truy cập tab "Công cụ", chọn "Tải bảng giá" hoặc "Tải tồn kho" (File Excel .xls hoặc .xlsx).</p>
+                  <h4 className="text-sm font-bold text-slate-800 mb-1">Lấy dữ liệu từ Report</h4>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Click vào <span className="text-red-600 font-bold">"Lấy file tồn kho"</span>. 
+                    Chọn các nhóm cần in giá: <span className="font-medium">ĐGD, DCNB, Phụ Kiện</span>. 
+                    Chọn siêu thị và trạng thái <span className="font-medium">MỚI</span>. 
+                    Xem báo cáo và tải file về máy.
+                  </p>
                 </div>
                 <div className="relative mb-6">
                   <div className="absolute -left-8 top-0 w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold">2</div>
-                  <h4 className="text-sm font-bold text-slate-800 mb-1">Chọn sản phẩm</h4>
-                  <p className="text-sm text-slate-600">Sử dụng thanh tìm kiếm hoặc quét mã vạch để đưa sản phẩm vào danh sách chờ in.</p>
+                  <h4 className="text-sm font-bold text-slate-800 mb-1">Đổ tồn vào hệ thống</h4>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Upload file vừa tải ở bước 1 vào mục <span className="font-bold text-indigo-600">"Tải File tồn kho"</span>.
+                  </p>
                 </div>
                 <div className="relative mb-6">
                   <div className="absolute -left-8 top-0 w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold">3</div>
-                  <h4 className="text-sm font-bold text-slate-800 mb-1">Thiết lập in</h4>
-                  <p className="text-sm text-slate-600">Chọn số lượng sticker cho từng món, nhấn icon "Bánh răng" để chỉnh font chữ, hiển thị giá gốc/khuyến mãi.</p>
+                  <h4 className="text-sm font-bold text-slate-800 mb-1">Tải file mẫu tự động</h4>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Chờ hệ thống xử lý trong giây lát. <span className="font-medium text-emerald-600">File mẫu in giá sẽ tự động được tải xuống máy của bạn.</span>
+                  </p>
                 </div>
                 <div className="relative">
                   <div className="absolute -left-8 top-0 w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold">4</div>
-                  <h4 className="text-sm font-bold text-slate-800 mb-1">Xuất PDF & In</h4>
-                  <p className="text-sm text-slate-600">Nhấn "In Sticker", chọn bố cục phù hợp. Hệ thống sẽ tạo file PDF để bạn gửi tới máy in.</p>
+                  <h4 className="text-sm font-bold text-slate-800 mb-1">Xuất file giá từ ERP & Upload</h4>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Vào ERP &gt; In giá. Chọn lần lượt từng ngành hàng (<span className="font-medium">ĐGD, DCNB, Phụ kiện</span>), nhóm hàng chọn <span className="font-medium">Tất cả</span>. 
+                    Chọn <span className="font-medium">"Thêm sản phẩm"</span> &gt; <span className="font-medium">"Nhập Excel"</span> &gt; Chọn file mẫu vừa tải ở bước 3. 
+                    Chọn mẫu in <span className="font-bold">81</span> &gt; In bảng giá &gt; Xuất file định dạng <span className="font-medium">"Data-only(*.xlsx)"</span>. 
+                    Làm lần lượt cho từng ngành hàng. Cuối cùng, vào <span className="font-bold text-emerald-600">"Tải File bảng giá"</span> và chọn tất cả các file giá vừa xuất để hoàn tất.
+                  </p>
                 </div>
               </div>
             </div>

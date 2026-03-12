@@ -1,5 +1,5 @@
 {
-  "name": "stickerevent",
+  "name": "stickerevent_Final",
   "description": "An application to upload a product data file (Excel) and search for specific products by their code. It displays detailed product information including calculated bonuses.",
   "requestFramePermissions": [
     "camera"

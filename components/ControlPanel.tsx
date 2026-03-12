@@ -3,7 +3,7 @@ import { Product } from '../types';
 import FileUpload from './FileUpload';
 import SearchBar from './SearchBar';
 import { PrintIcon, SettingsIcon, StarIcon, TagIcon, TrashIcon, ExportIcon, ImportIcon, PenSquareIcon, InventoryIcon, FilePlusIcon, UserIcon } from './Icons';
-import { Trash2, ShieldAlert } from 'lucide-react';
+import { Trash2, ShieldAlert, Info } from 'lucide-react';
 
 interface ControlPanelProps {
     employeeName: string;
@@ -46,6 +46,7 @@ interface ControlPanelProps {
     onOpenSuperAdminTools?: () => void;
     onSaveList: () => void;
     onViewSavedLists: () => void;
+    onOpenUserGuide?: () => void;
     showManagerInstructions?: boolean;
     onCloseInstructions?: () => void;
 }
@@ -108,14 +109,23 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                     <div className="pt-2 border-t border-slate-200">
                         <div className="flex items-center justify-between mb-2">
                             <h3 className="text-sm font-semibold text-slate-800">Nhập dữ liệu (Admin)</h3>
-                            <a 
-                                href="https://report.mwgroup.vn/home/dashboard/17" 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-xs font-semibold text-indigo-600 underline hover:text-indigo-800 hover:bg-indigo-50 px-2 py-1 rounded transition-colors"
-                            >
-                                Lấy File Tồn Kho
-                            </a>
+                            <div className="flex items-center gap-1">
+                                <a 
+                                    href="https://report.mwgroup.vn/home/dashboard/17" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-xs font-bold text-red-600 underline hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                >
+                                    Lấy File Tồn Kho
+                                </a>
+                                <button 
+                                    onClick={props.onOpenUserGuide}
+                                    className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
+                                    title="Xem hướng dẫn"
+                                >
+                                    <Info className="h-3.5 w-3.5" />
+                                </button>
+                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div className="relative">
@@ -185,10 +195,10 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                             Hướng dẫn cho Quản lý
                         </h3>
                         <div className="space-y-3 text-[11px] leading-relaxed text-indigo-800">
-                            <p><strong>Bước 1:</strong> Lấy file tồn kho &gt; Chọn nhóm ĐGD, DCNB, Phụ Kiện &gt; Chọn siêu thị &gt; Chọn trạng thái mới &gt; Xem báo cáo</p>
-                            <p><strong>Bước 2:</strong> Upload file vừa đỗ tồn vào <strong>"Tải File tồn kho"</strong></p>
-                            <p><strong>Bước 3:</strong> Chờ dữ liệu xử lý =&gt; File mẫu in giá sẽ tự động được tải xuống</p>
-                            <p><strong>Bước 4:</strong> Vào ERP &gt; Chọn Ngành hàng &gt; Chọn All nhóm hàng &gt; Bên phần in giá chọn "Thêm sản phẩm" &gt; Nhập Excel &gt; Chọn mẫu in 81 &gt; In bảng giá &gt; Xuất file định dạng "Data-only(*.xlsx)" (Làm lần lượt từng ngành hàng, mỗi ngành hàng sẽ có 1 file giá) &gt; Vào <strong>"Tải File bảng giá"</strong> chọn 1 lần nhiều file giá &gt; Bấm ok.</p>
+                            <p><strong>Bước 1:</strong> Click vào <span className="text-red-600 font-bold">"Lấy file tồn kho"</span> &gt; Chọn các nhóm cần in giá: ĐGD, DCNB, Phụ Kiện &gt; Chọn siêu thị &gt; Chọn trạng thái MỚI &gt; Xem báo cáo &gt; Tải file về máy.</p>
+                            <p><strong>Bước 2:</strong> Upload file vừa tải ở bước 1 vào mục <strong>"Tải File tồn kho"</strong>.</p>
+                            <p><strong>Bước 3:</strong> Chờ dữ liệu xử lý =&gt; <span className="text-emerald-600 font-bold">File mẫu in giá sẽ tự động được tải xuống máy.</span></p>
+                            <p><strong>Bước 4:</strong> Vào ERP &gt; In giá &gt; Chọn lần lượt từng ngành hàng (ĐGD, DCNB, Phụ kiện) &gt; Nhóm hàng chọn Tất cả &gt; Thêm sản phẩm &gt; Nhập Excel &gt; Chọn file mẫu vừa tải ở bước 3 &gt; Chọn mẫu in 81 &gt; In bảng giá &gt; Xuất file định dạng "Data-only(*.xlsx)". Sau khi làm xong cho tất cả ngành hàng, vào <strong>"Tải File bảng giá"</strong> chọn tất cả các file giá vừa xuất &gt; Bấm OK.</p>
                         </div>
                     </div>
                 )}

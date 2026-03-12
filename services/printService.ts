@@ -136,6 +136,11 @@ const generateModernPriceTagHTML = (product: Product, employeeName: string, sett
     const bonusShort = product.tongThuong > 0 ? `${Math.round(product.tongThuong / 1000)}` : '';
     const employeeInfoString = [abbreviatedName, bonusShort].filter(Boolean).join(' - ');
 
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+    const formattedTime = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const timestamp = `${formattedTime} ${formattedDate}`;
+
     // Logic for Discount Display (Short name -> New line, Long name -> Inline)
     const nameLength = product.sanPham.length;
     const isShortName = nameLength < 35; // Threshold for "short" name
@@ -250,6 +255,7 @@ const generateModernPriceTagHTML = (product: Product, employeeName: string, sett
                             ` : ''}
                             <div class="text-[8px] uppercase text-center leading-none shrink-0 w-full overflow-hidden whitespace-nowrap text-ellipsis">
                                 <p class="m-0 overflow-hidden text-ellipsis">${employeeInfoString}</p>
+                                <p class="m-0 mt-0-5 opacity-70">${timestamp}</p>
                             </div>
                         </div>
                     </footer>
@@ -306,10 +312,18 @@ const generatePriceTagHTML = (product: Product, employeeName: string, settings: 
   const shortenedBonus = Math.round(product.tongThuong / 1000);
   const bonusText = settings.showBonus && product.tongThuong > 0 ? `${new Intl.NumberFormat('vi-VN').format(shortenedBonus)}` : '';
   
+  const now = new Date();
+  const formattedDate = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+  const formattedTime = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const timestamp = `${formattedTime} ${formattedDate}`;
+
   let employeeBonusInfoHTML = '';
   if (employeeText || bonusText) {
       const parts = [employeeText, bonusText].filter(Boolean);
-      employeeBonusInfoHTML = `<div class="employee-bonus-info">${parts.join(' - ')}</div>`;
+      employeeBonusInfoHTML = `
+        <div class="employee-bonus-info">${parts.join(' - ')}</div>
+        <div class="employee-bonus-info" style="margin-top: 1px; opacity: 0.8;">${timestamp}</div>
+      `;
   }
     
   const finalPriceText = settings.shortenPrice 
@@ -1073,8 +1087,8 @@ const getPrintStyles = (settings: PrintSettings): string => {
       .size-small .ghost-bar, .size-small .vertical-info-container { width: 14px; }
       .size-small .price-tag { border-width: 2px; padding: 3px; }
       .size-small .inner-border { border-top-width: 3px; border-left-width: 3px; border-right-width: 3px; border-bottom-width: 12px; padding: 2px 0; }
-      .size-small .qr-code { width: 11mm; height: 11mm; }
-      .size-small .product-name { padding-right: 12mm; }
+      .size-small .qr-code { width: 5.5mm; height: 5.5mm; }
+      .size-small .product-name { padding-right: 7mm; }
       .size-small .vertical-text, .size-small .employee-bonus-info { font-size: 5pt; }
 
       .size-small .original-price.price-xs { font-size: 24pt; }
@@ -1119,36 +1133,39 @@ const getPrintStyles = (settings: PrintSettings): string => {
       .size-tiny .ghost-bar, .size-tiny .vertical-info-container { width: 12px; }
       .size-tiny .price-tag { border-width: 1px; padding: 2px; }
       .size-tiny .inner-border { border-top-width: 2px; border-left-width: 2px; border-right-width: 2px; border-bottom-width: 8px; padding: 2px 0; }
-      .size-tiny .qr-code { width: 9mm; height: 9mm; }
-      .size-tiny .product-name { padding-right: 10mm; }
+      .size-tiny .qr-code { width: 6mm; height: 6mm; }
+      .size-tiny .product-name { padding-right: 8mm; }
       .size-tiny .vertical-text, .size-tiny .employee-bonus-info { font-size: 4pt; }
 
-      .size-tiny .original-price.price-xs { font-size: 18pt; }
-      .size-tiny .original-price.price-sm { font-size: 16pt; }
-      .size-tiny .original-price.price-md { font-size: 14pt; }
-      .size-tiny .original-price.price-lg { font-size: 13pt; }
-      .size-tiny .original-price.price-xl { font-size: 12pt; }
-      .size-tiny .final-price.price-xs { font-size: 42pt; }
-      .size-tiny .final-price.price-sm { font-size: 38pt; }
-      .size-tiny .final-price.price-md { font-size: 33pt; }
-      .size-tiny .final-price.price-lg { font-size: 30pt; }
-      .size-tiny .final-price.price-xl { font-size: 27pt; }
-      .size-tiny .original-price.price-short-xs { font-size: 28pt; }
-      .size-tiny .original-price.price-short-sm { font-size: 26pt; }
-      .size-tiny .original-price.price-short-md { font-size: 24pt; }
-      .size-tiny .original-price.price-short-lg { font-size: 21pt; }
-      .size-tiny .original-price.price-short-xl { font-size: 19pt; }
-      .size-tiny .final-price.price-short-xs { font-size: 50pt; }
-      .size-tiny .final-price.price-short-sm { font-size: 50pt; }
-      .size-tiny .final-price.price-short-md { font-size: 50pt; }
-      .size-tiny .final-price.price-short-lg { font-size: 45pt; }
-      .size-tiny .final-price.price-short-xl { font-size: 40pt; }
+      .size-tiny .original-price.price-xs { font-size: 12pt; }
+      .size-tiny .original-price.price-sm { font-size: 11pt; }
+      .size-tiny .original-price.price-md { font-size: 9.5pt; }
+      .size-tiny .original-price.price-lg { font-size: 9pt; }
+      .size-tiny .original-price.price-xl { font-size: 8pt; }
+      .size-tiny .final-price.price-xs { font-size: 35pt; }
+      .size-tiny .final-price.price-sm { font-size: 31pt; }
+      .size-tiny .final-price.price-md { font-size: 28pt; }
+      .size-tiny .final-price.price-lg { font-size: 25pt; }
+      .size-tiny .final-price.price-xl { font-size: 23pt; }
+      .size-tiny .original-price.price-short-xs { font-size: 19pt; }
+      .size-tiny .original-price.price-short-sm { font-size: 17pt; }
+      .size-tiny .original-price.price-short-md { font-size: 16pt; }
+      .size-tiny .original-price.price-short-lg { font-size: 14pt; }
+      .size-tiny .original-price.price-short-xl { font-size: 13pt; }
+      .size-tiny .final-price.price-short-xs { font-size: 41pt; }
+      .size-tiny .final-price.price-short-sm { font-size: 41pt; }
+      .size-tiny .final-price.price-short-md { font-size: 41pt; }
+      .size-tiny .final-price.price-short-lg { font-size: 38pt; }
+      .size-tiny .final-price.price-short-xl { font-size: 34pt; }
       
-      /* HIDE Product Name and Promotion for Tiny Layout (24/page) */
-      .size-tiny .product-name-section { display: none; }
+      .size-tiny .product-name.name-lg { font-size: 4.5pt; }
+      .size-tiny .product-name.name-md { font-size: 4pt; }
+      .size-tiny .product-name.name-sm { font-size: 3.5pt; }
+      
+      /* Show Product Name for Tiny Layout (24/page) */
+      .size-tiny .product-name-section { display: flex; flex: 2 1 auto; }
       .size-tiny .promotion-section { display: none; }
-      /* Let price section take full height since others are hidden */
-      .size-tiny .price-section { flex: 1 1 auto; height: 100%; }
+      .size-tiny .price-section { flex: 6 1 auto; }
 
       /* Layout: Bill Printer */
       .size-bill .original-price::after { height: 2px; }

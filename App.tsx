@@ -142,6 +142,9 @@ export default function App(): React.JSX.Element {
   };
 
   useEffect(() => {
+    // Validate connection to Firestore on mount
+    validateConnection();
+    
     setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
   }, []);
 
@@ -1258,6 +1261,7 @@ export default function App(): React.JSX.Element {
               onOpenSuperAdminTools={isSuperAdmin ? () => setIsSuperAdminModalOpen(true) : undefined}
               onSaveList={handleSaveList}
               onViewSavedLists={handleViewSavedLists}
+              onOpenUserGuide={() => setIsUserGuideOpen(true)}
               activeTab={activeTab}
               showManagerInstructions={showManagerInstructions}
               onCloseInstructions={() => setShowManagerInstructions(false)}

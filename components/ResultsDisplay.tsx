@@ -42,7 +42,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ result, isHighlighted, onTogg
           </h3>
           <div className="flex items-center gap-2 mt-1">
             <span className="font-mono text-xs bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded">{result.msp}</span>
-            <span className="text-xs text-slate-500">Ngày in: {result.ngayIn || '-'}</span>
           </div>
         </div>
         

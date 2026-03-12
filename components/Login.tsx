@@ -114,7 +114,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             }
         } else if (role === 'staff') {
             if (adminCheckSnapshot.empty) {
-                setError(`Mã kho "${cleanStoreId}" chưa được khởi tạo bởi Admin. Vui lòng liên hệ quản lý để lấy đúng mã kho.`);
+                setError(`Lưu ý về lỗi "Mã kho chưa được khởi tạo": Lỗi này xuất hiện khi một Nhân viên đăng ký vào một mã kho mà chưa có Quản lý (Admin) nào đăng ký trước đó cho kho đó. Bạn hãy thông tin Quản lý, cần đăng ký tài khoản cho mã kho, sau đó Nhân viên mới có thể đăng ký vào.`);
                 setLoading(false);
                 return;
             }
@@ -123,24 +123,41 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         // Password check removed as per user request
 
         try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, finalPassword);
-            const user = userCredential.user;
-
-            // Create user document in Firestore
-            await setDoc(doc(db, 'users', user.uid), {
-              uid: user.uid,
-              username: username,
-              email: user.email,
-              role: role,
-              storeId: cleanStoreId,
-              createdAt: new Date()
-            });
-        } catch (regErr: any) {
-            if (regErr.code === 'auth/email-already-in-use') {
-                setError('Tên đăng nhập này đã được sử dụng. Vui lòng thử Đăng nhập.');
-            } else {
-                throw regErr;
+            let user;
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, finalPassword);
+                user = userCredential.user;
+            } catch (regErr: any) {
+                if (regErr.code === 'auth/email-already-in-use') {
+                    // If email exists, try to login to update the profile (allows updating storeId)
+                    try {
+                        const userCredential = await signInWithEmailAndPassword(auth, email, finalPassword);
+                        user = userCredential.user;
+                    } catch (loginErr: any) {
+                        // If login fails, it means password was wrong or some other issue
+                        throw { 
+                            code: 'auth/email-already-in-use', 
+                            message: 'Tên đăng nhập này đã được sử dụng. Nếu bạn muốn cập nhật mã kho, vui lòng nhập đúng mật khẩu cũ.' 
+                        };
+                    }
+                } else {
+                    throw regErr;
+                }
             }
+
+            if (user) {
+                // Create or update user document in Firestore
+                await setDoc(doc(db, 'users', user.uid), {
+                  uid: user.uid,
+                  username: username,
+                  email: user.email,
+                  role: role,
+                  storeId: cleanStoreId,
+                  createdAt: new Date()
+                }, { merge: true });
+            }
+        } catch (regErr: any) {
+            throw regErr;
         }
       }
       setLoading(false);
@@ -148,7 +165,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       console.error("Auth Error Details:", err.code, err.message);
       
       if (err.code === 'auth/email-already-in-use') {
-        setError('Tên đăng nhập này đã được sử dụng. Vui lòng thử Đăng nhập.');
+        setError(err.message || 'Tên đăng nhập này đã được sử dụng. Vui lòng thử Đăng nhập.');
       } else if (err.code === 'auth/invalid-email') {
         setError('Tên đăng nhập không hợp lệ.');
       } else if (err.code === 'auth/weak-password') {

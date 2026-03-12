@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, deleteDoc, doc, limit } from 'firebase/firestore';
 import { X, Search, Trash2, ShieldAlert, User as UserIcon } from 'lucide-react';
 
 interface SuperAdminModalProps {
@@ -18,17 +18,37 @@ const SuperAdminModal: React.FC<SuperAdminModalProps> = ({ isOpen, onClose }) =>
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchStoreId.trim()) return;
-
+    
     setLoading(true);
     setError(null);
     try {
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('storeId', '==', searchStoreId.trim().toUpperCase()));
+      let q;
+      
+      const term = searchStoreId.trim();
+      if (!term) {
+        // If empty, fetch latest 50 users
+        q = query(usersRef, limit(50));
+      } else {
+        // Try searching by storeId first
+        const qStore = query(usersRef, where('storeId', '==', term.toUpperCase()));
+        const snapStore = await getDocs(qStore);
+        
+        if (!snapStore.empty) {
+          setUsers(snapStore.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+          setLoading(false);
+          return;
+        }
+        
+        // If not found by storeId, try searching by username
+        q = query(usersRef, where('username', '==', term));
+      }
+      
       const snapshot = await getDocs(q);
-      setUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-      if (snapshot.empty) {
-        setError('Không tìm thấy người dùng nào cho mã kho này.');
+      setUsers(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+      
+      if (snapshot.empty && term) {
+        setError('Không tìm thấy người dùng nào khớp với từ khóa.');
       }
     } catch (err: any) {
       console.error("Search error:", err);
@@ -72,7 +92,7 @@ const SuperAdminModal: React.FC<SuperAdminModalProps> = ({ isOpen, onClose }) =>
 
         <div className="p-6 space-y-6 overflow-y-auto">
           <form onSubmit={handleSearch} className="space-y-2">
-            <label className="block text-sm font-medium text-slate-700">Tìm kiếm tài khoản theo Mã kho</label>
+            <label className="block text-sm font-medium text-slate-700">Tìm kiếm tài khoản theo Mã kho hoặc Tên đăng nhập</label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -80,7 +100,7 @@ const SuperAdminModal: React.FC<SuperAdminModalProps> = ({ isOpen, onClose }) =>
                   type="text"
                   value={searchStoreId}
                   onChange={(e) => setSearchStoreId(e.target.value)}
-                  placeholder="Nhập mã kho (VD: 910)..."
+                  placeholder="Nhập mã kho hoặc username..."
                   className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
                 />
               </div>

@@ -2,6 +2,28 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Suppress the "Cannot set property fetch of #<Window> which has only a getter" error
+      // which occurs in some iframe environments when libraries try to polyfill fetch.
+      (function() {
+        var handler = function(e) {
+          var msg = e.message || (e.error && e.error.message) || "";
+          if (msg.indexOf('fetch') !== -1 && (msg.indexOf('getter') !== -1 || msg.indexOf('read only') !== -1)) {
+            console.warn('Suppressed fetch assignment error:', msg);
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+            if (e.preventDefault) e.preventDefault();
+            return true;
+          }
+        };
+        window.addEventListener('error', handler, true);
+        window.onerror = function(msg) {
+          if (typeof msg === 'string' && msg.indexOf('fetch') !== -1 && msg.indexOf('getter') !== -1) {
+            console.warn('Suppressed fetch assignment error (onerror):', msg);
+            return true;
+          }
+        };
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
     <title>Tra cứu thông tin sản phẩm</title>
@@ -9,22 +31,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@700&family=Oswald:wght@700&display=swap" rel="stylesheet">
-    <script>
-      // Prevent libraries from trying to overwrite window.fetch, which is a read-only getter in this environment
-      (function() {
-        var originalFetch = window.fetch;
-        try {
-          Object.defineProperty(window, 'fetch', {
-            configurable: false,
-            enumerable: true,
-            get: function() { return originalFetch; },
-            set: function() { console.warn('Blocked attempt to overwrite window.fetch'); }
-          });
-        } catch (e) {
-          // If it's already non-configurable, this might fail, but that's okay
-        }
-      })();
-    </script>
 <style>
       @keyframes pulse-strong {
         0%, 100% {

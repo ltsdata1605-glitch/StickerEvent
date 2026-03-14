@@ -28,7 +28,7 @@ import UserGuideModal from './components/UserGuideModal';
 import { Info, ShieldAlert } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, orderBy, doc, getDoc } from 'firebase/firestore';
 import { clearStoreDataOnFirestore, validateConnection } from './services/firebaseService';
 
 interface ErrorBoundaryProps {
@@ -142,9 +142,6 @@ export default function App(): React.JSX.Element {
   };
 
   useEffect(() => {
-    // Validate connection to Firestore on mount
-    validateConnection();
-    
     setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
   }, []);
 
@@ -328,37 +325,56 @@ export default function App(): React.JSX.Element {
         }
       }
 
-      const [firestoreProducts, firestoreInventory] = await Promise.all([
-        fetchProductsFromFirestore(storeId),
-        fetchInventoryFromFirestore(storeId)
-      ]);
+      // Smart Sync: Check metadata for latest update timestamps (Only 2 reads total)
+      const productMetaRef = doc(db, 'stores', storeId, 'metadata', 'products');
+      const inventoryMetaRef = doc(db, 'stores', storeId, 'metadata', 'inventory');
       
-      if (firestoreProducts.length > 0) {
-        setAllProducts(firestoreProducts);
-        // Find latest update time from products
-        const productsRef = collection(db, 'stores', storeId, 'products');
-        const qLatest = query(productsRef, where('updatedAt', '!=', null));
-        const latestSnap = await getDocs(qLatest);
-        let latest = 0;
-        latestSnap.forEach(doc => {
-            const ts = doc.data().updatedAt?.toMillis() || 0;
-            if (ts > latest) latest = ts;
-        });
-        if (latest > 0) setUploadTimestamp(new Date(latest));
-      }
+      const [prodMetaSnap, invMetaSnap] = await Promise.all([
+          getDoc(productMetaRef),
+          getDoc(inventoryMetaRef)
+      ]);
 
-      if (firestoreInventory.length > 0) {
-        setInventory(firestoreInventory);
-        // Find latest update time from inventory
-        const invRef = collection(db, 'stores', storeId, 'inventory');
-        const qLatestInv = query(invRef, where('updatedAt', '!=', null));
-        const latestSnapInv = await getDocs(qLatestInv);
-        let latestInv = 0;
-        latestSnapInv.forEach(doc => {
-            const ts = doc.data().updatedAt?.toMillis() || 0;
-            if (ts > latestInv) latestInv = ts;
-        });
-        if (latestInv > 0) setInventoryUploadTimestamp(new Date(latestInv));
+      const firestoreLatestProducts = prodMetaSnap.exists() ? prodMetaSnap.data().lastUpdated?.toMillis() || 0 : 0;
+      const firestoreLatestInv = invMetaSnap.exists() ? invMetaSnap.data().lastUpdated?.toMillis() || 0 : 0;
+
+      // Compare with local timestamps
+      const localLatestProducts = uploadTimestamp?.getTime() || 0;
+      const localLatestInv = inventoryUploadTimestamp?.getTime() || 0;
+
+      const shouldFetchProducts = firestoreLatestProducts > localLatestProducts || allProducts.length === 0;
+      const shouldFetchInventory = firestoreLatestInv > localLatestInv || inventory.length === 0;
+
+      if (shouldFetchProducts || shouldFetchInventory) {
+          const fetchPromises = [];
+          if (shouldFetchProducts) fetchPromises.push(fetchProductsFromFirestore(storeId));
+          else fetchPromises.push(Promise.resolve(allProducts));
+
+          if (shouldFetchInventory) fetchPromises.push(fetchInventoryFromFirestore(storeId));
+          else fetchPromises.push(Promise.resolve(inventory));
+
+          const [firestoreProducts, firestoreInventory] = await Promise.all(fetchPromises);
+          
+          if (shouldFetchProducts && firestoreProducts.length > 0) {
+              setAllProducts(firestoreProducts);
+              if (firestoreLatestProducts > 0) setUploadTimestamp(new Date(firestoreLatestProducts));
+              // Save to local IndexedDB
+              saveData(firestoreProducts, {
+                  fileName: fileName || 'Dữ liệu từ server',
+                  uploadTimestamp: new Date(firestoreLatestProducts),
+                  fileExportDate: fileExportDate
+              });
+          }
+
+          if (shouldFetchInventory && firestoreInventory.length > 0) {
+              setInventory(firestoreInventory);
+              if (firestoreLatestInv > 0) setInventoryUploadTimestamp(new Date(firestoreLatestInv));
+              // Save to local IndexedDB
+              saveInventoryData(firestoreInventory, new Date(firestoreLatestInv));
+          }
+      } else {
+          // Data is already up to date locally
+          if (firestoreLatestProducts > 0) setUploadTimestamp(new Date(firestoreLatestProducts));
+          if (firestoreLatestInv > 0) setInventoryUploadTimestamp(new Date(firestoreLatestInv));
       }
 
     } catch (err: any) {
@@ -370,10 +386,11 @@ export default function App(): React.JSX.Element {
           displayError = `Lỗi hệ thống: ${errObj.error}`;
           if (errObj.error.includes('insufficient permissions')) {
             displayError = "Bạn không có quyền truy cập dữ liệu của kho này. Vui lòng liên hệ Admin để kiểm tra quyền hạn.";
+          } else if (errObj.error.includes('Quota exceeded')) {
+            displayError = "Hệ thống đã hết hạn mức truy cập miễn phí trong ngày. Vui lòng quay lại vào ngày mai hoặc nâng cấp gói dịch vụ.";
           }
         }
       } catch (e) {
-        // Not a JSON error
         if (err.message) displayError = err.message;
       }
       setError(displayError);

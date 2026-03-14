@@ -1,5 +1,5 @@
 import { db, auth } from '../firebase';
-import { collection, doc, writeBatch, getDocs, query, where, Timestamp, getDocFromServer, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs, query, where, Timestamp, getDocFromServer, deleteDoc, setDoc, getDoc, orderBy, limit } from 'firebase/firestore';
 import { Product, InventoryItem } from '../types';
 
 enum OperationType {
@@ -58,83 +58,82 @@ const BATCH_SIZE = 500;
 export const uploadProductsToFirestore = async (storeId: string, products: Product[]) => {
   if (!storeId) throw new Error("Mã kho không hợp lệ.");
   
-  const productsRef = collection(db, 'stores', storeId, 'products');
+  const chunksRef = collection(db, 'stores', storeId, 'productChunks');
   
   try {
-    for (let i = 0; i < products.length; i += BATCH_SIZE) {
-      const batch = writeBatch(db);
-      const chunk = products.slice(i, i + BATCH_SIZE);
-      
-      chunk.forEach(product => {
-        const safeMsp = product.msp.replace(/\//g, '_');
-        const docRef = doc(productsRef, safeMsp);
-        batch.set(docRef, {
-          ...product,
-          storeId,
-          updatedAt: Timestamp.now()
-        });
+    // Clear old chunks first
+    await clearStoreDataOnFirestore(storeId, 'productChunks');
+
+    const CHUNK_SIZE = 400; // Group 400 products into 1 document
+    for (let i = 0; i < products.length; i += CHUNK_SIZE) {
+      const chunk = products.slice(i, i + CHUNK_SIZE);
+      const chunkId = `chunk_${Math.floor(i / CHUNK_SIZE)}`;
+      await setDoc(doc(chunksRef, chunkId), {
+        items: JSON.stringify(chunk),
+        count: chunk.length,
+        updatedAt: Timestamp.now()
       });
-      
-      await batch.commit();
     }
+    
+    // Also update a master timestamp doc for smart sync
+    await setDoc(doc(db, 'stores', storeId, 'metadata', 'products'), {
+        lastUpdated: Timestamp.now(),
+        totalItems: products.length
+    });
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `stores/${storeId}/products`);
+    handleFirestoreError(error, OperationType.WRITE, `stores/${storeId}/productChunks`);
   }
 };
 
 export const uploadInventoryToFirestore = async (storeId: string, inventory: InventoryItem[]) => {
   if (!storeId) throw new Error("Mã kho không hợp lệ.");
   
-  const inventoryRef = collection(db, 'stores', storeId, 'inventory');
+  const chunksRef = collection(db, 'stores', storeId, 'inventoryChunks');
   
   try {
-    for (let i = 0; i < inventory.length; i += BATCH_SIZE) {
-      const batch = writeBatch(db);
-      const chunk = inventory.slice(i, i + BATCH_SIZE);
-      
-      chunk.forEach(item => {
-        const safeId = item.maSanPham.replace(/\//g, '_');
-        const docRef = doc(inventoryRef, safeId);
-        batch.set(docRef, {
-          ...item,
-          storeId,
-          updatedAt: Timestamp.now()
-        });
+    // Clear old chunks first
+    await clearStoreDataOnFirestore(storeId, 'inventoryChunks');
+
+    const CHUNK_SIZE = 300; // Inventory items are larger, use smaller chunks
+    for (let i = 0; i < inventory.length; i += CHUNK_SIZE) {
+      const chunk = inventory.slice(i, i + CHUNK_SIZE);
+      const chunkId = `chunk_${Math.floor(i / CHUNK_SIZE)}`;
+      await setDoc(doc(chunksRef, chunkId), {
+        items: JSON.stringify(chunk),
+        count: chunk.length,
+        updatedAt: Timestamp.now()
       });
-      
-      await batch.commit();
     }
+
+    // Update master timestamp
+    await setDoc(doc(db, 'stores', storeId, 'metadata', 'inventory'), {
+        lastUpdated: Timestamp.now(),
+        totalItems: inventory.length
+    });
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `stores/${storeId}/inventory`);
+    handleFirestoreError(error, OperationType.WRITE, `stores/${storeId}/inventoryChunks`);
   }
 };
 
 export const fetchProductsFromFirestore = async (storeId: string): Promise<Product[]> => {
   if (!storeId) return [];
   
-  const productsRef = collection(db, 'stores', storeId, 'products');
+  const chunksRef = collection(db, 'stores', storeId, 'productChunks');
   try {
-    const q = query(productsRef);
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(chunksRef);
+    let allProducts: Product[] = [];
     
-    return snapshot.docs.map(doc => {
+    snapshot.docs.forEach(doc => {
       const data = doc.data();
-      return {
-          msp: data.msp,
-          sanPham: data.sanPham,
-          thuongERP: data.thuongERP,
-          thuongNong: data.thuongNong,
-          tongThuong: data.tongThuong,
-          giaGoc: data.giaGoc,
-          giaGiam: data.giaGiam,
-          khuyenMai: data.khuyenMai,
-          ngayIn: data.ngayIn,
-          selected: false,
-          quantity: 1,
-      } as Product;
+      if (data.items) {
+        const chunk: Product[] = JSON.parse(data.items);
+        allProducts = [...allProducts, ...chunk];
+      }
     });
+    
+    return allProducts.map(p => ({ ...p, selected: false, quantity: 1 }));
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, `stores/${storeId}/products`);
+    handleFirestoreError(error, OperationType.LIST, `stores/${storeId}/productChunks`);
     return [];
   }
 };
@@ -142,51 +141,36 @@ export const fetchProductsFromFirestore = async (storeId: string): Promise<Produ
 export const fetchInventoryFromFirestore = async (storeId: string): Promise<InventoryItem[]> => {
   if (!storeId) return [];
   
-  const inventoryRef = collection(db, 'stores', storeId, 'inventory');
+  const chunksRef = collection(db, 'stores', storeId, 'inventoryChunks');
   try {
-    const q = query(inventoryRef);
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(chunksRef);
+    let allInventory: InventoryItem[] = [];
     
-    return snapshot.docs.map(doc => {
+    snapshot.docs.forEach(doc => {
       const data = doc.data();
-      return {
-          maSieuThi: data.maSieuThi,
-          tenSieuThi: data.tenSieuThi,
-          thuongHieu: data.thuongHieu,
-          nganhHang: data.nganhHang,
-          nhomHang: data.nhomHang,
-          maSanPham: data.maSanPham,
-          tenSanPham: data.tenSanPham,
-          trangThaiKinhDoanh: data.trangThaiKinhDoanh,
-          trangThaiSanPham: data.trangThaiSanPham,
-          tongSoLuong: data.tongSoLuong,
-          soLuongDiDuong: data.soLuongDiDuong,
-          soLuongThucTe: data.soLuongThucTe,
-          soLuongDaDat: data.soLuongDaDat,
-          soLuongCoTheBan: data.soLuongCoTheBan,
-          sucBan: data.sucBan,
-          saleAverage: data.saleAverage,
-          saleEstimate: data.saleEstimate,
-      } as InventoryItem;
+      if (data.items) {
+        const chunk: InventoryItem[] = JSON.parse(data.items);
+        allInventory = [...allInventory, ...chunk];
+      }
     });
+    
+    return allInventory;
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, `stores/${storeId}/inventory`);
+    handleFirestoreError(error, OperationType.LIST, `stores/${storeId}/inventoryChunks`);
     return [];
   }
 };
 
-export const clearStoreDataOnFirestore = async (storeId: string, collectionName: 'products' | 'inventory') => {
+export const clearStoreDataOnFirestore = async (storeId: string, collectionName: string) => {
     if (!storeId) return;
     const ref = collection(db, 'stores', storeId, collectionName);
     try {
         const snapshot = await getDocs(ref);
         const docs = snapshot.docs;
-        for (let i = 0; i < docs.length; i += BATCH_SIZE) {
-            const batch = writeBatch(db);
-            const chunk = docs.slice(i, i + BATCH_SIZE);
-            chunk.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-        }
+        // Batch delete is efficient for chunks since there are few documents
+        const batch = writeBatch(db);
+        docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
     } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, `stores/${storeId}/${collectionName}`);
     }
@@ -196,7 +180,7 @@ export const fetchAllUsers = async (storeId: string) => {
     if (!storeId) return [];
     const usersRef = collection(db, 'users');
     try {
-        const q = query(usersRef, where('storeId', '==', storeId));
+        const q = query(usersRef, where('storeId', '==', storeId), limit(100)); // Add limit to prevent massive reads
         const snapshot = await getDocs(q);
         return snapshot.docs.map(doc => doc.data());
     } catch (error) {
@@ -281,12 +265,15 @@ export const saveListToFirestore = async (storeId: string, userId: string, listN
   }
 };
 
-export const fetchSavedListsFromFirestore = async (storeId: string): Promise<any[]> => {
+export const fetchSavedListsFromFirestore = async (storeId: string, userId?: string): Promise<any[]> => {
   if (!storeId) return [];
   
   const listsRef = collection(db, 'stores', storeId, 'savedLists');
   try {
-    const q = query(listsRef);
+    let q = query(listsRef);
+    if (userId) {
+      q = query(listsRef, where('userId', '==', userId));
+    }
     const snapshot = await getDocs(q);
     
     const lists = snapshot.docs.map(doc => {
@@ -336,11 +323,10 @@ export const fetchUserState = async (userId: string): Promise<{ displayedProduct
   
   const stateRef = doc(db, 'users', userId, 'state', 'current');
   try {
-    const docSnap = await getDocs(query(collection(db, 'users', userId, 'state')));
-    const currentDoc = docSnap.docs.find(d => d.id === 'current');
+    const docSnap = await getDoc(stateRef);
     
-    if (currentDoc && currentDoc.exists()) {
-      const data = currentDoc.data();
+    if (docSnap.exists()) {
+      const data = docSnap.data();
       return {
         displayedProducts: JSON.parse(data.displayedProducts || '[]'),
         inventoryFilters: JSON.parse(data.inventoryFilters || '{}')
